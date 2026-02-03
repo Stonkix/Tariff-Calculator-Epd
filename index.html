@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Помощник подбора тарифов 1С-ЭПД</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+        <header class="page-title">
+            <h1>Помощник подбора тарифов 1С-ЭПД</h1>
+            <p>Рассчитайте стоимость подключения за несколько кликов</p>
+        </header>
+    <div class="calculator">
+        <!-- Основной режим -->
+        <div class="form-row">
+            <label>Выберите тип решения:</label>
+            <div class="toggle-group" id="main-mode-toggle">
+                <button class="toggle-btn selected" data-mode="typical">1С-ЭПД:Типовое решение</button>
+                <button class="toggle-btn" data-mode="project">1С-ЭПД:Проектное решение</button>
+            </div>
+        </div>
+
+        <!-- Подрежим (вид расчета) -->
+        <div class="form-row">
+            <label>Вариант расчета:</label>
+            <div class="toggle-group" id="sub-mode-toggle">
+                <button class="toggle-btn selected" data-sub="standard">Стандартный расчёт</button>
+                <button class="toggle-btn" data-sub="individual">Индивидуальный расчёт</button>
+            </div>
+        </div>
+
+        <!-- Динамический контент (будет наполняться позже) -->
+        <div id="dynamic-content" class="content-area">
+            <div class="placeholder-text">
+                Здесь будут параметры для режима: <br>
+                <strong id="current-mode-label">Типовое решение / Стандартный расчёт</strong>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

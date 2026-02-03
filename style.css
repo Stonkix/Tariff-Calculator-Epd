@@ -1,0 +1,109 @@
+:root {
+    --primary: #7C39BF;      /* Основной фиолетовый */
+    --secondary: #C580F2;    /* Средний фиолетовый */
+    --accent: #DAA0F2;       /* Светлый акцент */
+    --bg-light: #E1D5F2;     /* Фон блоков */
+    --bg-gray: #F2F2F2;      /* Общий фон страницы */
+    --text: #333;
+    --white: #ffffff;
+}
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    padding: 20px;
+    background: var(--bg-gray);
+    font-family: 'Montserrat', sans-serif;
+    color: var(--text);
+    line-height: 1.5;
+    color: var(--primary);
+}
+
+.calculator {
+    max-width: 800px;
+    margin: 40px auto;
+    padding: 30px;
+    background: var(--white);
+    border-radius: 28px;
+    box-shadow: 0 10px 30px rgba(124, 57, 191, 0.1);
+}
+
+.page-title {
+    text-align: center;
+    margin-bottom: 30px;
+    color: var(--primary);
+}
+
+.page-title h1 {
+    color: var(--primary);
+    font-weight: 800;
+    color: var(--secondary);
+    font-size: 28px;
+    margin: 0 0 10px 0;
+}
+
+.page-title p {
+    color: var(--secondary);
+    font-size: 16px;
+    margin: 0;
+}
+
+.form-row {
+    margin-bottom: 25px;
+}
+
+.form-row label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 10px;
+    font-size: 14px;
+    color: var(--primary);
+}
+
+/* Переключатели на основе структуры из источников [2, 3] */
+.toggle-group {
+    display: flex;
+    background: var(--bg-gray);
+    padding: 5px;
+    border-radius: 14px;
+    gap: 5px;
+}
+
+.toggle-btn {
+    flex: 1;
+    border: 2px solid transparent;
+    padding: 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: 600;
+    font-family: inherit;
+    background: transparent;
+    color: #7f8c8d;
+    transition: all 0.3s ease;
+}
+
+.toggle-btn.selected {
+    background: var(--primary);
+    color: var(--white);
+    box-shadow: 0 4px 12px rgba(124, 57, 191, 0.3);
+}
+
+.content-area {
+    margin-top: 30px;
+    padding: 40px;
+    border: 2px dashed var(--accent);
+    border-radius: 20px;
+    background: var(--bg-light);
+    text-align: center;
+}
+
+.placeholder-text {
+    color: var(--primary);
+    font-size: 18px;
+}
+
+@media (max-width: 600px) {
+    .toggle-group { flex-direction: column; }
+    .calculator { padding: 20px; }
+}
