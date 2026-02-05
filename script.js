@@ -1,253 +1,259 @@
-/**
- * 1. КОНФИГУРАЦИЯ
- */
 const CONFIG = {
-    // Названия пакетов точно как в JSON
+    columns: {
+        annual: "Стоимость пакета на 12 месяцев",
+        unit: "Стоимость одного документа",
+        project: "1С-ЭПД Проектное решение",
+        setup_win_1: "OC Windows\nnalog.ru или ЕСИА",
+        setup_win_2: "OC Windows\nnalog.ru и ЕСИА",
+        setup_mac_1: "OC MacOS nalog.ru или ЕСИА",
+        setup_mac_2: "OC MacOS nalog.ru и ЕСИА",
+        mchd_start: "Старт работы с МЧД в сервисе 1С-ЭДО",
+        mchd_issue: "Выпуск МЧД и добавление в ЭДО",
+        install_base: "Типовая Установка пр",
+        training: "Обучение пользователей по работе с Пр"
+    },
+    globalAddons: [
+        {
+            id: 'setup',
+            title: 'Настройка рабочего места',
+            items: [
+                { id: 'sw1', label: 'Win (nalog.ru или ЕСИА)', col: 'setup_win_1' },
+                { id: 'sw2', label: 'Win (nalog.ru и ЕСИА)', col: 'setup_win_2' },
+                { id: 'sm1', label: 'Mac (nalog.ru или ЕСИА)', col: 'setup_mac_1' },
+                { id: 'sm2', label: 'Mac (nalog.ru и ЕСИА)', col: 'setup_mac_2' }
+            ]
+        },
+        {
+            id: 'mchd',
+            title: 'Работа с МЧД',
+            items: [
+                { id: 'm1', label: 'Старт работы с МЧД', col: 'mchd_start' },
+                { id: 'm2', label: 'Выпуск и добавление МЧД', col: 'mchd_issue' }
+            ]
+        },
+        {
+            id: 'service',
+            title: 'Внедрение и обучение',
+            items: [
+                { id: 'i1', label: 'Типовая установка', col: 'install_base' },
+                { id: 't1', label: 'Обучение пользователей', col: 'training' }
+            ]
+        }
+    ],
     tariffKeys: [
-        "1С-ЭПД 600 документов",
-        "1С-ЭПД 1 000 документов",
-        "1С-ЭПД 5 000 документов",
-        "1С-ЭПД \n10 000 документов",
-        "1С-ЭПД \n50 000 документов\n",
+        "1С-ЭПД 600 документов", 
+        "1С-ЭПД 1 000 документов", 
+        "1С-ЭПД 5 000 документов", 
+        "1С-ЭПД \n10 000 документов", 
+        "1С-ЭПД \n50 000 документов\n", 
         "1С-ЭПД \n100 000 документов\n"
     ],
-    
-    limits: [600, 1000, 5000, 10000, 50000, 100000],
-
-    // Добавляем стоимость за документ прямо в конфиг (как дефолтные значения)
-    unitPrices: {
-        "1С-ЭПД 600 документов": 6,
-        "1С-ЭПД 1 000 документов": 5,
-        "1С-ЭПД 5 000 документов": 4.5,
-        "1С-ЭПД \n10 000 документов": 4,
-        "1С-ЭПД \n50 000 документов\n": 3,
-        "1С-ЭПД \n100 000 документов\n": 2.5,
-        "postpaid": 7
-    },
-    
-    sections: {
-        annual: "Стоимость пакета на 12 месяцев",
-        unit: "Стоимость одного документа"
-    }
+    limits: [600, 1000, 5000, 10000, 50000, 100000]
 };
 
-/**
- * 2. СОСТОЯНИЕ (STATE)
- */
 const STATE = {
     mainMode: 'typical',
     subMode: 'standard',
-    docsMonthly: 0,
     docsYearly: 0,
-    customUnitPrice: null, // Ручная цена от менеджера
-    pricing: {
-        annual: {}, 
-        unit: {},   
-        postpaid: CONFIG.unitPrices.postpaid 
-    }
+    customPrices: {}, 
+    addons: {},       
+    pricing: []       
 };
+
+// Хелпер для превращения "3 600" в 3600
+const parseNum = (val) => {
+    if (!val) return 0;
+    return parseFloat(val.toString().replace(/\s/g, '').replace(',', '.')) || 0;
+};
+
+CONFIG.globalAddons.forEach(addon => {
+    STATE.addons[addon.id] = { enabled: false, values: {} };
+});
 
 document.addEventListener('DOMContentLoaded', async () => {
     setupEventListeners();
-    
     try {
         const res = await fetch('Цены для калькулятора ЭПД.json');
-        const data = await res.json();
-
-        const annualObj = data.find(item => item && item["Тарифы 1С-ЭПД"] === CONFIG.sections.annual);
-        const unitObj = data.find(item => item && item["Тарифы 1С-ЭПД"] === CONFIG.sections.unit);
-
-        if (annualObj) STATE.pricing.annual = annualObj;
-        if (unitObj) {
-            STATE.pricing.unit = unitObj;
-            STATE.pricing.postpaid = unitObj["Постоплатный тариф 1С-ЭПД"] || CONFIG.unitPrices.postpaid;
+        const text = await res.text();
+        // Исправляем возможные ошибки в JSON
+        try {
+            STATE.pricing = JSON.parse(text);
+        } catch(e) {
+            STATE.pricing = JSON.parse("[" + text.replace(/}\s*{/g, "},{") + "]");
         }
-
-        console.log("Данные успешно загружены");
         calculate(); 
-    } catch (e) {
-        console.warn("Файл JSON не найден, используем данные из CONFIG");
-        // Если файл не загрузился, используем заглушки
-        STATE.pricing.annual = {
-            "1С-ЭПД 600 документов": 3600,
-            "1С-ЭПД 1 000 документов": 5000,
-            "1С-ЭПД 5 000 документов": 22500,
-            "1С-ЭПД \n10 000 документов": 40000,
-            "1С-ЭПД \n50 000 документов\n": 150000,
-            "1С-ЭПД \n100 000 документов\n": 200000
-        };
-        calculate();
-    }
+    } catch (e) { console.error("Ошибка загрузки цен"); }
 });
 
 function calculate() {
-    const container = document.getElementById('dynamic-content');
+    const mainContainer = document.getElementById('dynamic-content');
+    const addonsContainer = document.getElementById('addons-container');
     const totalDisplay = document.getElementById('total-price');
-    let total = 0;
-    let html = '';
 
+    if (!mainContainer || !STATE.pricing[0]) return;
+
+    let total = 0;
     const count = STATE.docsYearly;
 
     if (count <= 0) {
-        container.innerHTML = `<div class="placeholder-text">Введите количество документов</div>`;
-        if (totalDisplay) totalDisplay.textContent = '0 ₽';
+        mainContainer.innerHTML = `<div class="placeholder-text">Введите количество документов</div>`;
+        if (addonsContainer) addonsContainer.innerHTML = '';
+        totalDisplay.textContent = '0 ₽';
         return;
     }
 
-    // 1. ОПРЕДЕЛЯЕМ ПАКЕТ ПО ОБЪЕМУ
-    let tariffIdx = CONFIG.limits.findIndex(limit => limit >= count);
-    const isOverflow = tariffIdx === -1;
-    const finalIdx = isOverflow ? CONFIG.limits.length - 1 : tariffIdx;
-    
+    // Данные из JSON (первый объект, где лежат все цены)
+    const dataRow = STATE.pricing[0];
+    const unitRow = STATE.pricing[1]; // второй объект для цены за 1 док
+
+    let idx = CONFIG.limits.findIndex(l => l >= count);
+    const finalIdx = idx === -1 ? CONFIG.limits.length - 1 : idx;
     const key = CONFIG.tariffKeys[finalIdx];
-    const limitValue = CONFIG.limits[finalIdx]; // Например, 5000
-    const limitMonth = Math.floor(limitValue / 12);
-    
-    // 2. БЕРЕМ СТАНДАРТНУЮ ЦЕНУ ИЗ JSON ИЛИ CONFIG
-    const standardUnitPrice = STATE.pricing.unit[key] || CONFIG.unitPrices[key] || 0;
-
-    if (STATE.subMode === 'standard') {
-        STATE.customUnitPrice = null; // Сбрасываем кастом при переходе в стандарт
-        total = STATE.pricing.annual[key] || (limitValue * standardUnitPrice);
-
-        html = `
-            <div class="tariff-card animated-fade">
-                <div class="tariff-header">
-                    <span class="tariff-label">Стандартные условия</span>
-                    <h3 class="tariff-title">${key.replace(/\n/g, ' ')}</h3>
-                </div>
-                <div class="detailing-section">
-                    <div class="detail-row">
-                        <div class="detail-info"><strong>Лимит пакета</strong><span>${limitValue.toLocaleString('ru-RU')} шт./год (~${limitMonth} в мес.)</span></div>
-                        <div class="detail-price">Включено</div>
-                    </div>
-                    <div class="detail-row highlight">
-                        <div class="detail-info"><strong>Цена за 1 документ</strong><span>Стандартный тариф</span></div>
-                        <div class="detail-price">${standardUnitPrice} ₽</div>
-                    </div>
-                </div>
-            </div>`;
-    } else {
-        // 3. ИНДИВИДУАЛЬНЫЙ РЕЖИМ
-        if (STATE.customUnitPrice === null) {
-            STATE.customUnitPrice = standardUnitPrice;
-        }
-
-        // ИТОГО = Лимит пакета * Кастомная цена
-        total = limitValue * STATE.customUnitPrice;
-
-        html = `
-            <div class="tariff-card animated-fade" style="border-color: var(--secondary);">
-                <div class="tariff-header">
-                    <span class="tariff-label" style="background: var(--secondary); color: white;">Индивидуальное предложение</span>
-                    <h3 class="tariff-title">${key.replace(/\n/g, ' ')}</h3>
-                </div>
-                <div class="detailing-section">
-                    <div class="detail-row">
-                        <div class="detail-info">
-                            <strong>Лимит документов</strong>
-                            <span>Пакет на ${limitValue.toLocaleString('ru-RU')} шт./год</span>
-                        </div>
-                        <div class="detail-price">Включено</div>
-                    </div>
-                    
-                    <div class="detail-row highlight" style="background: rgba(197, 128, 242, 0.1);">
-                        <div class="detail-info">
-                            <strong>Цена за 1 документ (₽)</strong>
-                            <span>Укажите персональную цену</span>
-                        </div>
-                        <div class="detail-price">
-                            <input type="number" 
-                                   class="inline-edit-input" 
-                                   value="${STATE.customUnitPrice}" 
-                                   step="0.1" 
-                                   oninput="window.updateUnitPrice(this.value)">
-                        </div>
-                    </div>
-
-                    <div class="detail-row">
-                        <div class="detail-info">
-                            <strong>Стоимость пакета</strong>
-                            <span>С учетом вашей скидки</span>
-                        </div>
-                        <div class="detail-price" id="row-total">${total.toLocaleString('ru-RU')} ₽</div>
-                    </div>
-                </div>
-            </div>`;
-    }
-
-    container.innerHTML = html;
-    if (totalDisplay) totalDisplay.textContent = total.toLocaleString('ru-RU') + ' ₽';
-}
-
-/**
- * Обновление цены за документ
- */
-window.updateUnitPrice = (val) => {
-    const newPrice = parseFloat(val) || 0;
-    STATE.customUnitPrice = newPrice;
-    
-    // Пересчет без полной перерисовки для удобства ввода
-    const count = STATE.docsYearly;
-    let tariffIdx = CONFIG.limits.findIndex(limit => limit >= count);
-    const finalIdx = tariffIdx === -1 ? CONFIG.limits.length - 1 : tariffIdx;
     const limitValue = CONFIG.limits[finalIdx];
 
-    const newTotal = limitValue * newPrice;
+    // 1. БАЗОВЫЙ ТАРИФ
+    const standardBasePrice = parseNum(dataRow[key]);
+    const standardUnitPrice = parseNum(unitRow[key]);
     
-    document.getElementById('total-price').textContent = newTotal.toLocaleString('ru-RU') + ' ₽';
-    const rowTotal = document.getElementById('row-total');
-    if (rowTotal) rowTotal.textContent = newTotal.toLocaleString('ru-RU') + ' ₽';
-};
+    let currentUnitPrice = STATE.customPrices['unit'] !== undefined ? STATE.customPrices['unit'] : standardUnitPrice;
+    let basePrice = (STATE.subMode === 'standard') ? standardBasePrice : (count * currentUnitPrice);
+    total += basePrice;
 
-function setupEventListeners() {
-    document.querySelectorAll('.toggle-group .toggle-btn').forEach(btn => {
-        btn.onclick = (e) => {
-            const parent = e.target.closest('.toggle-group');
-            parent.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('selected'));
-            e.target.classList.add('selected');
+    // 2. ПРОЕКТНОЕ РЕШЕНИЕ (ключ: "1С-ЭПД Проектное решение")
+    let projPrice = 0;
+    if (STATE.mainMode === 'project') {
+        projPrice = STATE.customPrices['project'] !== undefined 
+            ? STATE.customPrices['project'] 
+            : parseNum(dataRow["1С-ЭПД Проектное решение"]);
+        total += projPrice;
+    }
 
-            if (parent.id === 'main-mode-toggle') STATE.mainMode = e.target.dataset.mode;
-            if (parent.id === 'sub-mode-toggle') STATE.subMode = e.target.dataset.sub;
-            
-            updateUI();
-            calculate();
-        };
+    // 3. ДОПЫ
+    CONFIG.globalAddons.forEach(addon => {
+        const state = STATE.addons[addon.id];
+        if (state.enabled) {
+            addon.items.forEach(item => {
+                const qty = parseInt(state.values[item.id]) || 0;
+                if (qty > 0) {
+                    // Ищем цену напрямую по ключу из JSON
+                    const jsonKey = CONFIG.columns[item.col]; 
+                    const price = STATE.customPrices[item.col] !== undefined 
+                        ? STATE.customPrices[item.col] 
+                        : parseNum(dataRow[jsonKey]);
+                    
+                    total += price * qty;
+                }
+            });
+        }
     });
+
+    renderMainCard(mainContainer, key, limitValue, basePrice, currentUnitPrice, projPrice);
+    renderAddons(addonsContainer);
+    totalDisplay.textContent = Math.round(total).toLocaleString('ru-RU') + ' ₽';
 }
 
-window.updateDocs = (type, value) => {
-    const val = parseInt(value) || 0;
-    const monthInput = document.getElementById('docs-month');
-    const yearInput = document.getElementById('docs-year');
+function renderMainCard(container, key, limit, basePrice, unitPrice, projPrice) {
+    container.innerHTML = `
+        <div class="tariff-card animated-fade ${STATE.subMode === 'individual' ? 'individual-mode' : ''}">
+            <div class="tariff-header">
+                <span class="tariff-label">${STATE.subMode === 'standard' ? 'Стандарт' : 'Индивидуально'}</span>
+                <h3 class="tariff-title">${key.replace(/\n/g, ' ')}</h3>
+            </div>
+            <div class="detailing-section">
+                <div class="detail-row">
+                    <span>Пакет документов (${limit} шт.)</span>
+                    <strong>${Math.round(basePrice).toLocaleString('ru-RU')} ₽</strong>
+                </div>
+                <div class="detail-row highlight">
+                    <span>Цена за 1 документ</span>
+                    <div class="price-edit-block">
+                         <input type="number" class="inline-edit" value="${unitPrice}" step="0.1" oninput="window.updateCustomPrice('unit', this.value)">
+                         <span class="unit-text">₽</span>
+                    </div>
+                </div>
+                ${STATE.mainMode === 'project' ? `
+                <div class="detail-row project-row">
+                    <span>Проектное решение</span>
+                    <div class="price-edit-block">
+                        <input type="number" class="inline-edit" value="${projPrice}" oninput="window.updateCustomPrice('project', this.value)">
+                        <span class="unit-text">₽</span>
+                    </div>
+                </div>` : ''}
+            </div>
+        </div>`;
+}
 
-    if (type === 'month') {
-        STATE.docsMonthly = val;
-        STATE.docsYearly = val * 12;
-        if (yearInput) yearInput.value = STATE.docsYearly;
-    } else {
-        STATE.docsYearly = val;
-        STATE.docsMonthly = Math.round(val / 12);
-        if (monthInput) monthInput.value = STATE.docsMonthly;
+function renderAddons(container) {
+    if (!container || !STATE.pricing[0]) return;
+    const dataRow = STATE.pricing[0];
+
+    container.innerHTML = `<h3 class="section-title">Дополнительные услуги</h3>` + CONFIG.globalAddons.map(addon => {
+        const state = STATE.addons[addon.id];
+        return `
+        <div class="addon-card ${state.enabled ? 'active' : ''}">
+            <div class="addon-header">
+                <span class="addon-title">${addon.title}</span>
+                <label class="custom-switch">
+                    <input type="checkbox" ${state.enabled ? 'checked' : ''} onchange="window.toggleAddon('${addon.id}')">
+                    <span class="slider round"></span>
+                </label>
+            </div>
+            <div class="addon-variants" style="${state.enabled ? 'display:block' : 'display:none'}">
+                ${addon.items.map(item => `
+                    <div class="variant-row">
+                        <span class="v-label">${item.label}</span>
+                        <div class="v-controls">
+                            <input type="number" class="qty-input" min="0" placeholder="0" value="${state.values[item.id] || ''}" oninput="window.updateAddonValue('${addon.id}', '${item.id}', this.value)">
+                            <span class="unit-text">шт.</span>
+                        </div>
+                    </div>`).join('')}
+                <details class="custom-price-details">
+                    <summary>Настроить цены за ед.</summary>
+                    <div class="custom-price-content">
+                        ${addon.items.map(item => {
+                            const jsonKey = CONFIG.columns[item.col];
+                            const defaultPrice = parseNum(dataRow[jsonKey]);
+                            return `
+                            <div class="variant-row price-row">
+                                <span>${item.label}</span>
+                                <input type="number" class="price-input" value="${STATE.customPrices[item.col] !== undefined ? STATE.customPrices[item.col] : defaultPrice}" oninput="window.updateCustomPrice('${item.col}', this.value)">
+                            </div>`;
+                        }).join('')}
+                    </div>
+                </details>
+            </div>
+        </div>`;
+    }).join('');
+}
+window.toggleAddon = (id) => { STATE.addons[id].enabled = !STATE.addons[id].enabled; calculate(); };
+window.updateAddonValue = (aId, iId, val) => { STATE.addons[aId].values[iId] = parseInt(val) || 0; calculate(); };
+window.updateCustomPrice = (col, val) => { 
+    if (val === '') STATE.customPrices[col] = undefined;
+    else STATE.customPrices[col] = parseFloat(val); 
+    calculate(); 
+};
+
+window.updateDocs = (type, val) => {
+    const v = parseInt(val) || 0;
+    if(type === 'month') { 
+        STATE.docsYearly = v * 12; 
+        document.getElementById('docs-year').value = STATE.docsYearly; 
+    } else { 
+        STATE.docsYearly = v; 
+        document.getElementById('docs-month').value = Math.round(v/12); 
     }
     calculate();
 };
 
-function updateUI() {
-    const label = document.getElementById('current-mode-label');
-    if (label) {
-        const mainText = STATE.mainMode === 'typical' ? 'Типовое решение' : 'Проектное решение';
-        const subText = STATE.subMode === 'standard' ? 'Стандартный расчёт' : 'Индивидуальный расчёт';
-        label.innerHTML = `${mainText} / ${subText}`;
-    }
+function setupEventListeners() {
+    document.querySelectorAll('.toggle-btn').forEach(btn => {
+        btn.onclick = (e) => {
+            const group = e.target.closest('.toggle-group');
+            group.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('selected'));
+            e.target.classList.add('selected');
+            if (group.id === 'main-mode-toggle') STATE.mainMode = e.target.dataset.mode;
+            if (group.id === 'sub-mode-toggle') STATE.subMode = e.target.dataset.sub;
+            calculate();
+        };
+    });
 }
-
-window.downloadKP = () => {
-    alert('Формирование коммерческого предложения...');
-};
-
-const originalUpdateDocs = window.updateDocs;
-window.updateDocs = (type, value) => {
-    STATE.customUnitPrice = null; 
-    originalUpdateDocs(type, value);
-};
