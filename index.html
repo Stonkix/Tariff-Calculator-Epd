@@ -31,11 +31,38 @@
             </div>
         </div>
 
+        <div class="form-row">
+        <div class="grid-adaptive">
+            <div class="input-group">
+                <label for="docs-month">Количество документов в месяц</label>
+                <input type="number" id="docs-month" placeholder="0" min="0" 
+                    oninput="window.updateDocs('month', this.value)">
+            </div>
+            <div class="input-group">
+                <label for="docs-year">Количество документов в год</label>
+                <input type="number" id="docs-year" placeholder="0" min="0" 
+                    oninput="window.updateDocs('year', this.value)">
+            </div>
+        </div>
+    </div>
+
         <!-- Динамический контент (будет наполняться позже) -->
         <div id="dynamic-content" class="content-area">
             <div class="placeholder-text">
                 Здесь будут параметры для режима: <br>
                 <strong id="current-mode-label">Типовое решение / Стандартный расчёт</strong>
+            </div>
+        </div>
+
+        <div class="kp-container" onclick="window.downloadKP()">
+            <div class="total-bar">
+                <div class="total-info">
+                    <span class="kp-label">Скачать коммерческое предложение</span>
+                    <span class="kp-subtitle">Нажмите, чтобы сохранить расчет в PDF</span>
+                </div>
+                <div class="total-amount">
+                    <strong id="total-price">0 ₽</strong>
+                </div>
             </div>
         </div>
     </div>
