@@ -15,12 +15,12 @@ const CONFIG = {
     globalAddons: [
         {
             id: 'setup',
-            title: 'Настройка рабочего места',
+            title: 'Удалённая настройка рабочего места для работы с электронной подписью',
             items: [
-                { id: 'sw1', label: 'Win (nalog.ru или ЕСИА)', col: 'setup_win_1' },
-                { id: 'sw2', label: 'Win (nalog.ru и ЕСИА)', col: 'setup_win_2' },
-                { id: 'sm1', label: 'Mac (nalog.ru или ЕСИА)', col: 'setup_mac_1' },
-                { id: 'sm2', label: 'Mac (nalog.ru и ЕСИА)', col: 'setup_mac_2' }
+                { id: 'sw1', label: 'Для Windows (nalog.ru или ЕСИА)', col: 'setup_win_1' },
+                { id: 'sw2', label: 'Для Windows (nalog.ru и ЕСИА)', col: 'setup_win_2' },
+                { id: 'sm1', label: 'Для MacOS (nalog.ru или ЕСИА)', col: 'setup_mac_1' },
+                { id: 'sm2', label: 'Для MacOS (nalog.ru и ЕСИА)', col: 'setup_mac_2' }
             ]
         },
         {
@@ -36,7 +36,7 @@ const CONFIG = {
             title: 'Внедрение и обучение',
             items: [
                 { id: 'i1', label: 'Типовая установка', col: 'install_base' },
-                { id: 't1', label: 'Обучение пользователей', col: 'training' }
+                { id: 't1', label: 'Обучение пользователей 1 группа', col: 'training' }
             ]
         }
     ],
@@ -89,23 +89,26 @@ function calculate() {
     const mainContainer = document.getElementById('dynamic-content');
     const addonsContainer = document.getElementById('addons-container');
     const totalDisplay = document.getElementById('total-price');
+    const detailsContent = document.getElementById('details-content');
 
     if (!mainContainer || !STATE.pricing[0]) return;
 
     let total = 0;
+    let detailLines = []; 
     const count = STATE.docsYearly;
 
     if (count <= 0) {
         mainContainer.innerHTML = `<div class="placeholder-text">Введите количество документов</div>`;
         if (addonsContainer) addonsContainer.innerHTML = '';
         totalDisplay.textContent = '0 ₽';
+        if (detailsContent) detailsContent.innerHTML = "Введите количество документов для формирования отчета";
         return;
     }
 
-    // Данные из JSON (первый объект, где лежат все цены)
     const dataRow = STATE.pricing[0];
-    const unitRow = STATE.pricing[1]; // второй объект для цены за 1 док
+    const unitRow = STATE.pricing[1];
 
+    // Определяем подходящий лимит пакета
     let idx = CONFIG.limits.findIndex(l => l >= count);
     const finalIdx = idx === -1 ? CONFIG.limits.length - 1 : idx;
     const key = CONFIG.tariffKeys[finalIdx];
@@ -115,17 +118,34 @@ function calculate() {
     const standardBasePrice = parseNum(dataRow[key]);
     const standardUnitPrice = parseNum(unitRow[key]);
     
+    // В индивидуальном режиме используем кастомную цену за документ (или стандартную из JSON, если не ввели)
     let currentUnitPrice = STATE.customPrices['unit'] !== undefined ? STATE.customPrices['unit'] : standardUnitPrice;
-    let basePrice = (STATE.subMode === 'standard') ? standardBasePrice : (count * currentUnitPrice);
+    
+    // РАСЧЕТ БАЗОВОЙ ЦЕНЫ:
+    // Стандарт: цена из JSON. 
+    // Индив: Полный лимит пакета * цена за док.
+    let basePrice = (STATE.subMode === 'standard') 
+        ? standardBasePrice 
+        : (limitValue * currentUnitPrice);
+    
     total += basePrice;
 
-    // 2. ПРОЕКТНОЕ РЕШЕНИЕ (ключ: "1С-ЭПД Проектное решение")
+    // Формируем строку для детализации тарифа
+    const tariffName = key.replace(/\n/g, ' ');
+    if (STATE.subMode === 'standard') {
+        detailLines.push(`${tariffName} (Стандарт) | ${Math.round(basePrice).toLocaleString()} ₽`);
+    } else {
+        detailLines.push(`${tariffName} (Индив.) | ${limitValue} док. x ${currentUnitPrice} ₽ | ${Math.round(basePrice).toLocaleString()} ₽`);
+    }
+
+    // 2. ПРОЕКТНОЕ РЕШЕНИЕ
     let projPrice = 0;
     if (STATE.mainMode === 'project') {
         projPrice = STATE.customPrices['project'] !== undefined 
             ? STATE.customPrices['project'] 
             : parseNum(dataRow["1С-ЭПД Проектное решение"]);
         total += projPrice;
+        detailLines.push(`Проектное решение | ${Math.round(projPrice).toLocaleString()} ₽`);
     }
 
     // 3. ДОПЫ
@@ -135,13 +155,14 @@ function calculate() {
             addon.items.forEach(item => {
                 const qty = parseInt(state.values[item.id]) || 0;
                 if (qty > 0) {
-                    // Ищем цену напрямую по ключу из JSON
                     const jsonKey = CONFIG.columns[item.col]; 
                     const price = STATE.customPrices[item.col] !== undefined 
                         ? STATE.customPrices[item.col] 
                         : parseNum(dataRow[jsonKey]);
                     
-                    total += price * qty;
+                    const lineTotal = price * qty;
+                    total += lineTotal;
+                    detailLines.push(`${item.label} | ${price.toLocaleString()} ₽ x ${qty} | ${lineTotal.toLocaleString()} ₽`);
                 }
             });
         }
@@ -149,14 +170,24 @@ function calculate() {
 
     renderMainCard(mainContainer, key, limitValue, basePrice, currentUnitPrice, projPrice);
     renderAddons(addonsContainer);
+    
     totalDisplay.textContent = Math.round(total).toLocaleString('ru-RU') + ' ₽';
+    if (detailsContent) {
+        detailsContent.innerHTML = detailLines.join('<br>');
+    }
 }
 
 function renderMainCard(container, key, limit, basePrice, unitPrice, projPrice) {
+    const isIndividual = STATE.subMode === 'individual';
+    
+    // Чтобы курсор не прыгал, мы проверяем: если этот инпут уже существует в DOM и он в фокусе, 
+    // мы не должны перерисовывать всю карточку через innerHTML.
+    // Но для простоты реализации в данном коде, самый надежный способ — использовать тип text и onchange.
+    
     container.innerHTML = `
-        <div class="tariff-card animated-fade ${STATE.subMode === 'individual' ? 'individual-mode' : ''}">
+        <div class="tariff-card animated-fade ${isIndividual ? 'individual-mode' : ''}">
             <div class="tariff-header">
-                <span class="tariff-label">${STATE.subMode === 'standard' ? 'Стандарт' : 'Индивидуально'}</span>
+                <span class="tariff-label">${!isIndividual ? 'Стандарт' : 'Индивидуально'}</span>
                 <h3 class="tariff-title">${key.replace(/\n/g, ' ')}</h3>
             </div>
             <div class="detailing-section">
@@ -167,7 +198,14 @@ function renderMainCard(container, key, limit, basePrice, unitPrice, projPrice) 
                 <div class="detail-row highlight">
                     <span>Цена за 1 документ</span>
                     <div class="price-edit-block">
-                         <input type="number" class="inline-edit" value="${unitPrice}" step="0.1" oninput="window.updateCustomPrice('unit', this.value)">
+                        ${isIndividual 
+                            ? `<input type="text" 
+                                      class="inline-edit" 
+                                      value="${unitPrice.toString().replace('.', ',')}" 
+                                      onchange="window.updateCustomPrice('unit', this.value)"
+                                      placeholder="0,00">`
+                            : `<strong>${unitPrice.toString().replace('.', ',')}</strong>`
+                        }
                          <span class="unit-text">₽</span>
                     </div>
                 </div>
@@ -175,7 +213,13 @@ function renderMainCard(container, key, limit, basePrice, unitPrice, projPrice) 
                 <div class="detail-row project-row">
                     <span>Проектное решение</span>
                     <div class="price-edit-block">
-                        <input type="number" class="inline-edit" value="${projPrice}" oninput="window.updateCustomPrice('project', this.value)">
+                        ${isIndividual 
+                            ? `<input type="text" 
+                                      class="inline-edit" 
+                                      value="${projPrice.toString().replace('.', ',')}" 
+                                      onchange="window.updateCustomPrice('project', this.value)">`
+                            : `<strong>${projPrice.toLocaleString()}</strong>`
+                        }
                         <span class="unit-text">₽</span>
                     </div>
                 </div>` : ''}
@@ -186,6 +230,7 @@ function renderMainCard(container, key, limit, basePrice, unitPrice, projPrice) 
 function renderAddons(container) {
     if (!container || !STATE.pricing[0]) return;
     const dataRow = STATE.pricing[0];
+    const isIndividual = STATE.subMode === 'individual';
 
     container.innerHTML = `<h3 class="section-title">Дополнительные услуги</h3>` + CONFIG.globalAddons.map(addon => {
         const state = STATE.addons[addon.id];
@@ -207,6 +252,8 @@ function renderAddons(container) {
                             <span class="unit-text">шт.</span>
                         </div>
                     </div>`).join('')}
+                
+                ${isIndividual ? `
                 <details class="custom-price-details">
                     <summary>Настроить цены за ед.</summary>
                     <div class="custom-price-content">
@@ -220,16 +267,27 @@ function renderAddons(container) {
                             </div>`;
                         }).join('')}
                     </div>
-                </details>
+                </details>` : ''}
             </div>
         </div>`;
     }).join('');
 }
+
 window.toggleAddon = (id) => { STATE.addons[id].enabled = !STATE.addons[id].enabled; calculate(); };
 window.updateAddonValue = (aId, iId, val) => { STATE.addons[aId].values[iId] = parseInt(val) || 0; calculate(); };
 window.updateCustomPrice = (col, val) => { 
-    if (val === '') STATE.customPrices[col] = undefined;
-    else STATE.customPrices[col] = parseFloat(val); 
+    if (val === '') {
+        STATE.customPrices[col] = undefined;
+    } else {
+        // Заменяем запятую на точку для корректного parseFloat
+        const normalizedVal = val.replace(',', '.');
+        const num = parseFloat(normalizedVal);
+        
+        if (!isNaN(num)) {
+            STATE.customPrices[col] = num;
+        }
+    }
+    // Вызываем расчет
     calculate(); 
 };
 

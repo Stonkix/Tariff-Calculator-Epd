@@ -410,3 +410,74 @@ input:checked + .slider:before { transform: translateX(22px); }
     border-radius: 8px;
     text-align: center;
 }
+
+/* Контейнер для поля ввода и значка рубля/шт */
+.price-edit-block, .v-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+/* Общие стили для всех полей ввода в карточках */
+.inline-edit, 
+.price-input, 
+.qty-input {
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    color: #444;
+    
+    background-color: #ffffff;
+    border: 1.5px solid #e0e0e0;
+    border-radius: 6px;
+    
+    padding: 4px 8px;
+    width: 75px;
+    text-align: right;
+    
+    transition: all 0.2s ease;
+    outline: none;
+}
+
+/* Стиль поля, когда оно в фокусе (нажали для ввода) */
+.inline-edit:focus, 
+.price-input:focus, 
+.qty-input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(255, 93, 91, 0.1);
+    background-color: #fff;
+}
+
+/* Стили для режима "Индивидуально" (подсветка рамок) */
+.individual-mode .inline-edit {
+    border-color: var(--primary);
+    background-color: #fffcfc;
+}
+
+/* Текст после инпута (₽, шт.) */
+.unit-text {
+    font-size: 14px;
+    color: #888;
+    font-weight: 400;
+    min-width: 15px;
+}
+
+/* Убираем стандартные стрелочки у оставшихся числовых полей */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+/* Стили для выпадающего списка цен в допах */
+.custom-price-content {
+    background: #f1f1f1;
+    padding: 10px;
+    border-radius: 8px;
+    margin-top: 5px;
+}
+
+.price-row {
+    margin-bottom: 8px;
+}
