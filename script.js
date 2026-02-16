@@ -841,22 +841,51 @@ window.downloadKP = async () => {
         .map(l => l.replace(/<[^>]*>?/gm, '').trim())
         .filter(Boolean);
 
-    // Таблица строк — как на скрине: название слева, цена справа фиолетовым
+    // Пытаемся отделить название от цены.
+    // Цена — последний токен, похожий на число с буквой (2 900 Р, 4 000 P, 1 250 руб. и т.п.)
+    const PRICE_RE = /(\d[\d\s]*[\d])\s*[РрPp₽руб\.]+\s*$/i;
+
+    function parseLine(line) {
+        // Вариант 1: разделитель |
+        if (line.includes('|')) {
+            const parts = line.split('|');
+            return {
+                title: parts.slice(0, -1).join('|').trim(),
+                price: parts[parts.length - 1].trim()
+            };
+        }
+        // Вариант 2: цена в конце строки через двоеточие  "Название: 2 900 Р"
+        const colonIdx = line.lastIndexOf(':');
+        if (colonIdx !== -1) {
+            const after = line.slice(colonIdx + 1).trim();
+            if (PRICE_RE.test(after)) {
+                return {
+                    title: line.slice(0, colonIdx).trim(),
+                    price: after
+                };
+            }
+        }
+        // Вариант 3: цена просто в конце строки без двоеточия "Название 2 900 Р"
+        const m = line.match(/^(.+?)\s{2,}(\d[\d\s]*[\d]\s*[РрPp₽руб\.]+)\s*$/i);
+        if (m) {
+            return { title: m[1].trim(), price: m[2].trim() };
+        }
+        // Нет цены — вся строка как название
+        return { title: line, price: null };
+    }
+
     function buildRows(arr) {
         return arr.map(line => {
-            if (line.includes('|')) {
-                const parts = line.split('|');
-                const title = parts.length > 2
-                    ? parts[0].trim() + ' | ' + parts[1].trim()
-                    : parts[0].trim();
-                const price = parts[parts.length - 1].trim();
+            const { title, price } = parseLine(line);
+            if (price) {
                 return `<tr>
-                    <td style="padding:6px 0;font-size:10pt;color:#1a1a2e;border-bottom:1px solid #ede8ff;">${title}</td>
-                    <td style="padding:6px 0;text-align:right;font-weight:700;color:#7c3aed;font-size:10pt;white-space:nowrap;border-bottom:1px solid #ede8ff;">${price}</td>
+                    <td style="padding:4px 0;font-size:10pt;color:#1a1a2e;border-bottom:1px solid #ede8ff;">${title}</td>
+                    <td style="padding:4px 0;text-align:right;font-weight:700;color:#7c3aed;font-size:10pt;white-space:nowrap;border-bottom:1px solid #ede8ff;">${price}</td>
                 </tr>`;
             }
+            // Строка без цены — полная ширина, но тот же стиль (не серая)
             return `<tr>
-                <td colspan="2" style="padding:4px 0;font-size:8.5pt;color:#888;border-bottom:1px solid #f3f0ff;">${line}</td>
+                <td colspan="2" style="padding:7px 0;font-size:10pt;color:#1a1a2e;border-bottom:1px solid #ede8ff;">${title}</td>
             </tr>`;
         }).join('');
     }
@@ -924,7 +953,7 @@ window.downloadKP = async () => {
         await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
         const canvas = await html2canvas(div, {
-            scale:           3,
+            scale:           3,      // ⬅ КАЧЕСТВО: 2 = норм, 3 = чётко, 4 = максимум (тяжелее)
             useCORS:         true,
             allowTaint:      false,
             backgroundColor: '#ffffff',
@@ -955,7 +984,7 @@ window.downloadKP = async () => {
 
         for (let i = 0; i < pages.length; i++) {
             const canvas  = await renderPageToCanvas(pages[i]);
-            const imgData = canvas.toDataURL('image/jpeg', 1.0);
+            const imgData = canvas.toDataURL('image/jpeg', 1.0); // ⬅ КАЧЕСТВО JPEG: 0.0–1.0
             const imgH    = (canvas.height / canvas.width) * PDF_W;
 
             if (i > 0) doc.addPage();
