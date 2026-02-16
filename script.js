@@ -725,6 +725,22 @@ const UI = {
 document.addEventListener('DOMContentLoaded', async () => {
     State.initAddons();
     UI.init();
+    
+    // Восстановление контактных данных из localStorage
+    const contactFields = ['partner-name', 'partner-phone', 'partner-email', 'client-name'];
+    contactFields.forEach(fieldId => {
+        const saved = localStorage.getItem(`epd-${fieldId}`);
+        const element = document.getElementById(fieldId);
+        if (saved && element) {
+            element.value = saved;
+        }
+        // Сохранение при изменении
+        if (element) {
+            element.addEventListener('input', (e) => {
+                localStorage.setItem(`epd-${fieldId}`, e.target.value);
+            });
+        }
+    });
 
     // Загрузка JSON
     try {
@@ -741,9 +757,219 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
+// ─── Кэш шрифтов Montserrat (загружаем один раз) ───────────────────────────
+const _fontCache = {};
+
+async function loadMontserratFont(weight) {
+    // weight: 'regular' | 'bold'
+    if (_fontCache[weight]) return _fontCache[weight];
+
+    // Google Fonts CSS API → вытаскиваем реальный URL woff2/ttf файла
+    const display = 'swap';
+    const wght = weight === 'bold' ? '700' : '400';
+    const cssUrl = `https://fonts.googleapis.com/css2?family=Montserrat:wght@${wght}&display=${display}`;
+
+    const cssResp = await fetch(cssUrl, { headers: { 'Accept': 'text/css' } });
+    if (!cssResp.ok) throw new Error('Не удалось загрузить CSS шрифта Montserrat');
+    const css = await cssResp.text();
+
+    // Берём последний src url() — он с кириллицей (Google возвращает несколько блоков @font-face)
+    const urlMatches = [...css.matchAll(/url\(([^)]+)\)\s+format\(['"]?(?:woff2|truetype)['"]?\)/g)];
+    if (!urlMatches.length) throw new Error('URL шрифта не найден в CSS');
+
+    // Ищем блок с unicode-range для кириллицы (U+0400-...) — он идёт последним в latin
+    // Берём все блоки и ищем кириллический
+    const blocks = css.split('@font-face');
+    let fontUrl = null;
+    for (const block of blocks) {
+        if (block.includes('U+0400') || block.includes('cyrillic')) {
+            const m = block.match(/url\(([^)]+)\)/);
+            if (m) { fontUrl = m[1].replace(/['"]/g, ''); break; }
+        }
+    }
+    // Fallback: последний найденный url
+    if (!fontUrl) {
+        const last = urlMatches[urlMatches.length - 1];
+        fontUrl = last[1].replace(/['"]/g, '');
+    }
+
+    const fontResp = await fetch(fontUrl);
+    if (!fontResp.ok) throw new Error(`Не удалось загрузить файл шрифта: ${fontUrl}`);
+    const fontBytes = await fontResp.arrayBuffer();
+
+    _fontCache[weight] = fontBytes;
+    return fontBytes;
+}
+
 // Глобальные функции
-window.downloadKP = () => {
-    alert("Функция генерации PDF");
+window.downloadKP = async () => {
+    const result = Calculator.calculateAll();
+    if (result.total === 0) {
+        alert('Сначала сделайте расчет!');
+        return;
+    }
+
+    const partnerName  = document.getElementById('partner-name')?.value.trim()  || '';
+    const clientName   = document.getElementById('client-name')?.value.trim()   || 'Клиент';
+    const partnerPhone = document.getElementById('partner-phone')?.value.trim() || '';
+    const partnerEmail = document.getElementById('partner-email')?.value.trim() || '';
+
+    const isTypical = State.data.mainMode === 'typical';
+    const prefix    = isTypical ? 'pdf-base' : 'pdf-project';
+
+    async function toBase64(url) {
+        try {
+            const res = await fetch(url);
+            if (!res.ok) return '';
+            const blob = await res.blob();
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload  = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+            });
+        } catch (e) { return ''; }
+    }
+
+    const [b64Header, b64Middle, b64Low] = await Promise.all([
+        toBase64(`${prefix}-header.jpg`),
+        toBase64(`${prefix}-middle.jpg`),
+        toBase64(`${prefix}-low.jpg`),
+    ]);
+
+    const lines = result.lines
+        .map(l => l.replace(/<[^>]*>?/gm, '').trim())
+        .filter(Boolean);
+
+    // Таблица строк — как на скрине: название слева, цена справа фиолетовым
+    function buildRows(arr) {
+        return arr.map(line => {
+            if (line.includes('|')) {
+                const parts = line.split('|');
+                const title = parts.length > 2
+                    ? parts[0].trim() + ' | ' + parts[1].trim()
+                    : parts[0].trim();
+                const price = parts[parts.length - 1].trim();
+                return `<tr>
+                    <td style="padding:6px 0;font-size:10pt;color:#1a1a2e;border-bottom:1px solid #ede8ff;">${title}</td>
+                    <td style="padding:6px 0;text-align:right;font-weight:700;color:#7c3aed;font-size:10pt;white-space:nowrap;border-bottom:1px solid #ede8ff;">${price}</td>
+                </tr>`;
+            }
+            return `<tr>
+                <td colspan="2" style="padding:4px 0;font-size:8.5pt;color:#888;border-bottom:1px solid #f3f0ff;">${line}</td>
+            </tr>`;
+        }).join('');
+    }
+
+    // Блок итого — светло-фиолетовый фон, сумма по центру, как на скрине
+    const summaryBlock = `
+        <div style="background:#f3f0ff;border-radius:10px;padding:20px 28px;margin-top:18px;text-align:center;">
+            <div style="font-size:10pt;color:#6d28d9;margin-bottom:6px;">
+                Стоимость для ${clientName}:
+            </div>
+            <div style="font-size:22pt;font-weight:800;color:#7c3aed;letter-spacing:-0.5px;">
+                ${Helpers.fmt(result.total)} ₽
+            </div>
+        </div>`;
+
+    // Блок контактов — как на скрине: заголовок+текст слева, ФИО/номер/почта справа
+    const contactBlock = `
+        <div style="border:1px solid #ede8ff;border-radius:10px;padding:16px 24px;margin-top:14px;display:flex;justify-content:space-between;align-items:center;">
+            <div>
+                <div style="font-size:11pt;font-weight:700;color:#7c3aed;margin-bottom:4px;">Как подключиться</div>
+                <div style="font-size:9pt;color:#888;">Свяжитесь с нами, чтобы подключить сервис</div>
+            </div>
+            <div style="text-align:right;font-size:9.5pt;color:#1a1a2e;line-height:1.7;">
+                ${partnerName  ? `<div style="font-weight:600;">${partnerName}</div>`  : ''}
+                ${partnerPhone ? `<div>${partnerPhone}</div>` : ''}
+                ${partnerEmail ? `<div>${partnerEmail}</div>` : ''}
+            </div>
+        </div>`;
+
+    // ── СТРАНИЦА 1: header + таблица + итого + контакты ──────────────────────
+    const page1HTML = `
+        <div style="width:794px;background:#fff;box-sizing:border-box;">
+            ${b64Header ? `<img src="${b64Header}" style="width:794px;display:block;">` : ''}
+            <div style="padding:22px 50px 36px;">
+                <div style="font-size:13pt;font-weight:800;color:#7c3aed;margin-bottom:12px;">Стоимость подключения:</div>
+                <table style="width:100%;border-collapse:collapse;">
+                    <tbody>${buildRows(lines)}</tbody>
+                </table>
+                ${summaryBlock}
+                ${contactBlock}
+            </div>
+        </div>`;
+
+    // ── СТРАНИЦА 2: middle.jpg ────────────────────────────────────────────────
+    const page2HTML = `
+        <div style="width:794px;background:#fff;box-sizing:border-box;">
+            ${b64Middle ? `<img src="${b64Middle}" style="width:794px;display:block;">` : ''}
+        </div>`;
+
+    // ── СТРАНИЦА 3: low.jpg ───────────────────────────────────────────────────
+    const page3HTML = `
+        <div style="width:794px;background:#fff;box-sizing:border-box;">
+            ${b64Low ? `<img src="${b64Low}" style="width:794px;display:block;">` : ''}
+        </div>`;
+
+    const PDF_W = 595.28;
+    const PDF_H = 841.89;
+
+    async function renderPageToCanvas(htmlContent) {
+        const div = document.createElement('div');
+        div.style.cssText = 'position:absolute;top:0;left:0;width:794px;background:#fff;z-index:99999;';
+        div.innerHTML = htmlContent;
+        document.body.appendChild(div);
+
+        await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+        const canvas = await html2canvas(div, {
+            scale:           3,
+            useCORS:         true,
+            allowTaint:      false,
+            backgroundColor: '#ffffff',
+            width:           794,
+            height:          div.scrollHeight,
+            windowWidth:     794
+        });
+
+        document.body.removeChild(div);
+        return canvas;
+    }
+
+    // Лоадер
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(30,0,60,0.5);z-index:99998;display:flex;align-items:center;justify-content:center;';
+    overlay.innerHTML = `
+        <div style="background:#fff;padding:28px 40px;border-radius:14px;text-align:center;font-family:Arial,sans-serif;">
+            <div style="font-size:26px;margin-bottom:10px;">📄</div>
+            <div style="font-size:14px;font-weight:600;color:#6d28d9;">Создаём PDF...</div>
+        </div>`;
+    document.body.appendChild(overlay);
+
+    try {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'portrait' });
+
+        const pages = [page1HTML, page2HTML, page3HTML];
+
+        for (let i = 0; i < pages.length; i++) {
+            const canvas  = await renderPageToCanvas(pages[i]);
+            const imgData = canvas.toDataURL('image/jpeg', 1.0);
+            const imgH    = (canvas.height / canvas.width) * PDF_W;
+
+            if (i > 0) doc.addPage();
+            doc.addImage(imgData, 'JPEG', 0, 0, PDF_W, Math.min(imgH, PDF_H));
+        }
+
+        doc.save(`КП_${clientName}.pdf`);
+
+    } catch (err) {
+        console.error('Ошибка PDF:', err);
+        alert(`Ошибка создания PDF: ${err.message}`);
+    } finally {
+        document.body.removeChild(overlay);
+    }
 };
 
 window.updateServicePrice = (keyRef, value) => {
