@@ -757,50 +757,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
-// ─── Кэш шрифтов Montserrat (загружаем один раз) ───────────────────────────
-const _fontCache = {};
-
-async function loadMontserratFont(weight) {
-    // weight: 'regular' | 'bold'
-    if (_fontCache[weight]) return _fontCache[weight];
-
-    // Google Fonts CSS API → вытаскиваем реальный URL woff2/ttf файла
-    const display = 'swap';
-    const wght = weight === 'bold' ? '700' : '400';
-    const cssUrl = `https://fonts.googleapis.com/css2?family=Montserrat:wght@${wght}&display=${display}`;
-
-    const cssResp = await fetch(cssUrl, { headers: { 'Accept': 'text/css' } });
-    if (!cssResp.ok) throw new Error('Не удалось загрузить CSS шрифта Montserrat');
-    const css = await cssResp.text();
-
-    // Берём последний src url() — он с кириллицей (Google возвращает несколько блоков @font-face)
-    const urlMatches = [...css.matchAll(/url\(([^)]+)\)\s+format\(['"]?(?:woff2|truetype)['"]?\)/g)];
-    if (!urlMatches.length) throw new Error('URL шрифта не найден в CSS');
-
-    // Ищем блок с unicode-range для кириллицы (U+0400-...) — он идёт последним в latin
-    // Берём все блоки и ищем кириллический
-    const blocks = css.split('@font-face');
-    let fontUrl = null;
-    for (const block of blocks) {
-        if (block.includes('U+0400') || block.includes('cyrillic')) {
-            const m = block.match(/url\(([^)]+)\)/);
-            if (m) { fontUrl = m[1].replace(/['"]/g, ''); break; }
-        }
-    }
-    // Fallback: последний найденный url
-    if (!fontUrl) {
-        const last = urlMatches[urlMatches.length - 1];
-        fontUrl = last[1].replace(/['"]/g, '');
-    }
-
-    const fontResp = await fetch(fontUrl);
-    if (!fontResp.ok) throw new Error(`Не удалось загрузить файл шрифта: ${fontUrl}`);
-    const fontBytes = await fontResp.arrayBuffer();
-
-    _fontCache[weight] = fontBytes;
-    return fontBytes;
-}
-
 // Глобальные функции
 window.downloadKP = async () => {
     const result = Calculator.calculateAll();
@@ -841,12 +797,9 @@ window.downloadKP = async () => {
         .map(l => l.replace(/<[^>]*>?/gm, '').trim())
         .filter(Boolean);
 
-    // Пытаемся отделить название от цены.
-    // Цена — последний токен, похожий на число с буквой (2 900 Р, 4 000 P, 1 250 руб. и т.п.)
     const PRICE_RE = /(\d[\d\s]*[\d])\s*[РрPp₽руб\.]+\s*$/i;
 
     function parseLine(line) {
-        // Вариант 1: разделитель |
         if (line.includes('|')) {
             const parts = line.split('|');
             return {
@@ -854,7 +807,6 @@ window.downloadKP = async () => {
                 price: parts[parts.length - 1].trim()
             };
         }
-        // Вариант 2: цена в конце строки через двоеточие  "Название: 2 900 Р"
         const colonIdx = line.lastIndexOf(':');
         if (colonIdx !== -1) {
             const after = line.slice(colonIdx + 1).trim();
@@ -865,12 +817,10 @@ window.downloadKP = async () => {
                 };
             }
         }
-        // Вариант 3: цена просто в конце строки без двоеточия "Название 2 900 Р"
         const m = line.match(/^(.+?)\s{2,}(\d[\d\s]*[\d]\s*[РрPp₽руб\.]+)\s*$/i);
         if (m) {
             return { title: m[1].trim(), price: m[2].trim() };
         }
-        // Нет цены — вся строка как название
         return { title: line, price: null };
     }
 
@@ -879,18 +829,16 @@ window.downloadKP = async () => {
             const { title, price } = parseLine(line);
             if (price) {
                 return `<tr>
-                    <td style="padding:4px 0;font-size:10pt;color:#1a1a2e;border-bottom:1px solid #ede8ff;">${title}</td>
-                    <td style="padding:4px 0;text-align:right;font-weight:700;color:#7c3aed;font-size:10pt;white-space:nowrap;border-bottom:1px solid #ede8ff;">${price}</td>
+                    <td style="padding:2px 0;font-size:10pt;color:#1a1a2e;border-bottom:1px solid #ede8ff;">${title}</td>
+                    <td style="padding:2px 0;text-align:right;font-weight:700;color:#7c3aed;font-size:10pt;white-space:nowrap;border-bottom:1px solid #ede8ff;">${price}</td>
                 </tr>`;
             }
-            // Строка без цены — полная ширина, но тот же стиль (не серая)
             return `<tr>
-                <td colspan="2" style="padding:7px 0;font-size:10pt;color:#1a1a2e;border-bottom:1px solid #ede8ff;">${title}</td>
+                <td colspan="2" style="padding:2px 0;font-size:10pt;color:#1a1a2e;border-bottom:1px solid #ede8ff;">${title}</td>
             </tr>`;
         }).join('');
     }
 
-    // Блок итого — светло-фиолетовый фон, сумма по центру, как на скрине
     const summaryBlock = `
         <div style="background:#f3f0ff;border-radius:10px;padding:20px 28px;margin-top:18px;text-align:center;">
             <div style="font-size:10pt;color:#6d28d9;margin-bottom:6px;">
@@ -901,11 +849,18 @@ window.downloadKP = async () => {
             </div>
         </div>`;
 
-    // Блок контактов — как на скрине: заголовок+текст слева, ФИО/номер/почта справа
+    // Определяем URL для гиперссылки
+    const helpUrl = isTypical 
+        ? 'https://astral.ru/help/1s-epd/1s-epd-tipovoe-reshenie/obshchaya-informatsiya/nachalo-raboty-s-1s-epd/'
+        : 'https://astral.ru/help/1s-epd/1s-epd-proektnoe-reshenie/';
+
+    // Блок контактов с кликабельной ссылкой
     const contactBlock = `
         <div style="border:1px solid #ede8ff;border-radius:10px;padding:16px 24px;margin-top:14px;display:flex;justify-content:space-between;align-items:center;">
             <div>
-                <div style="font-size:11pt;font-weight:700;color:#7c3aed;margin-bottom:4px;">Как подключиться</div>
+                <div style="font-size:12pt;font-weight:700;margin-bottom:4px;">
+                    <a href="${helpUrl}" style="color:#7c3aed;text-decoration:underline;" target="_blank">Как подключиться</a>
+                </div>
                 <div style="font-size:9pt;color:#888;">Свяжитесь с нами, чтобы подключить сервис</div>
             </div>
             <div style="text-align:right;font-size:9.5pt;color:#1a1a2e;line-height:1.7;">
@@ -915,7 +870,6 @@ window.downloadKP = async () => {
             </div>
         </div>`;
 
-    // ── СТРАНИЦА 1: header + таблица + итого + контакты ──────────────────────
     const page1HTML = `
         <div style="width:794px;background:#fff;box-sizing:border-box;">
             ${b64Header ? `<img src="${b64Header}" style="width:794px;display:block;">` : ''}
@@ -929,13 +883,11 @@ window.downloadKP = async () => {
             </div>
         </div>`;
 
-    // ── СТРАНИЦА 2: middle.jpg ────────────────────────────────────────────────
     const page2HTML = `
         <div style="width:794px;background:#fff;box-sizing:border-box;">
             ${b64Middle ? `<img src="${b64Middle}" style="width:794px;display:block;">` : ''}
         </div>`;
 
-    // ── СТРАНИЦА 3: low.jpg ───────────────────────────────────────────────────
     const page3HTML = `
         <div style="width:794px;background:#fff;box-sizing:border-box;">
             ${b64Low ? `<img src="${b64Low}" style="width:794px;display:block;">` : ''}
@@ -943,8 +895,10 @@ window.downloadKP = async () => {
 
     const PDF_W = 595.28;
     const PDF_H = 841.89;
+    
+    let linkCoordinates = null; // Координаты ссылки для PDF
 
-    async function renderPageToCanvas(htmlContent) {
+    async function renderPageToCanvas(htmlContent, pageIndex) {
         const div = document.createElement('div');
         div.style.cssText = 'position:absolute;top:0;left:0;width:794px;background:#fff;z-index:99999;';
         div.innerHTML = htmlContent;
@@ -952,8 +906,34 @@ window.downloadKP = async () => {
 
         await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
+        // Если это первая страница, находим координаты ссылки
+        if (pageIndex === 0) {
+            const linkElement = div.querySelector('a[href*="astral.ru"]');
+            if (linkElement) {
+                const rect = linkElement.getBoundingClientRect();
+                const divRect = div.getBoundingClientRect();
+                
+                // Вычисляем относительные координаты внутри div
+                const relativeX = rect.left - divRect.left;
+                const relativeY = rect.top - divRect.top;
+                
+                // Конвертируем из px (794px ширина) в pt (595.28pt ширина PDF)
+                const scaleX = PDF_W / 794;
+                const scaleY = PDF_W / 794; // Используем тот же масштаб
+                
+                
+                const pad = 4; // px отступ в PDF-координатах
+                linkCoordinates = {
+                    x: relativeX * scaleX - pad,
+                    y: relativeY * scaleY - pad,
+                    width: rect.width * scaleX + pad * 2,
+                    height: rect.height * scaleY + pad * 2
+                };
+            }
+        }
+
         const canvas = await html2canvas(div, {
-            scale:           3,      // ⬅ КАЧЕСТВО: 2 = норм, 3 = чётко, 4 = максимум (тяжелее)
+            scale:           3,
             useCORS:         true,
             allowTaint:      false,
             backgroundColor: '#ffffff',
@@ -966,7 +946,6 @@ window.downloadKP = async () => {
         return canvas;
     }
 
-    // Лоадер
     const overlay = document.createElement('div');
     overlay.style.cssText = 'position:fixed;inset:0;background:rgba(30,0,60,0.5);z-index:99998;display:flex;align-items:center;justify-content:center;';
     overlay.innerHTML = `
@@ -983,12 +962,23 @@ window.downloadKP = async () => {
         const pages = [page1HTML, page2HTML, page3HTML];
 
         for (let i = 0; i < pages.length; i++) {
-            const canvas  = await renderPageToCanvas(pages[i]);
-            const imgData = canvas.toDataURL('image/jpeg', 1.0); // ⬅ КАЧЕСТВО JPEG: 0.0–1.0
+            const canvas  = await renderPageToCanvas(pages[i], i);
+            const imgData = canvas.toDataURL('image/jpeg', 1.0);
             const imgH    = (canvas.height / canvas.width) * PDF_W;
 
             if (i > 0) doc.addPage();
             doc.addImage(imgData, 'JPEG', 0, 0, PDF_W, Math.min(imgH, PDF_H));
+            
+            // Добавляем кликабельную ссылку на первой странице
+            if (i === 0 && linkCoordinates) {
+                doc.link(
+                    linkCoordinates.x, 
+                    linkCoordinates.y, 
+                    linkCoordinates.width, 
+                    linkCoordinates.height, 
+                    { url: helpUrl }
+                );
+            }
         }
 
         doc.save(`КП_${clientName}.pdf`);
