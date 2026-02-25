@@ -81,7 +81,7 @@ body {
     border-color: var(--primary);
 }
 
-/* Сетка для карточек (МЧД и Подписи) */
+/* Сетка для карточек */
 .sig-grid, .mchd-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -125,7 +125,6 @@ body {
     margin-top: 10px;
 }
 
-/* Заголовки внутри карточек */
 .sig-header {
     display: flex;
     justify-content: space-between;
@@ -338,6 +337,11 @@ input:disabled + .slider {
     border-bottom: 1px solid #f0f0f0;
 }
 
+.detail-row > strong,
+.detail-row > .price-edit-block {
+    flex-shrink: 0;
+}
+
 .detail-row.highlight {
     background: #faf8fc;
     padding: 12px 15px;
@@ -346,23 +350,13 @@ input:disabled + .slider {
     margin: 10px 0;
 }
 
+/* FIX 5: Убрана ракета и обводка */
 .detail-row.project-row {
     background: linear-gradient(135deg, #f3ecff 0%, #faf8fc 100%);
     padding: 12px 15px;
     border-radius: 10px;
-    border: 2px solid var(--accent);
+    border: none;
     margin: 10px 0;
-    position: relative;
-}
-
-.detail-row.project-row::before {
-    content: "🚀";
-    position: absolute;
-    left: -8px;
-    top: 50%;
-    transform: translateY(-50%);
-    font-size: 20px;
-    opacity: 0.3;
 }
 
 .detail-row.project-row span {
@@ -377,24 +371,46 @@ input:disabled + .slider {
 .price-edit-block {
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: 6px;
+    flex-shrink: 0;
 }
 
+/* Единый стиль для всех редактируемых полей в карточке тарифа */
+.tariff-field-input {
+    width: 110px;
+    padding: 8px 10px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    text-align: center;
+    font-weight: 600;
+    font-size: 14px;
+    background: #ffffff;
+    transition: border-color 0.3s, box-shadow 0.3s;
+    font-family: inherit;
+}
+
+.tariff-field-input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(124, 57, 191, 0.1);
+}
+
+/* Оставляем inline-edit для обратной совместимости */
 .inline-edit {
-    width: 80px;
-    padding: 4px 8px;
-    border: 2px solid var(--primary);
-    border-radius: 6px;
-    text-align: right;
-    font-weight: 700;
+    width: 110px;
+    padding: 8px 10px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    text-align: center;
+    font-weight: 600;
     background: #ffffff;
     transition: all 0.3s;
+    font-family: inherit;
 }
 
 .inline-edit:focus {
     outline: none;
-    border-color: var(--secondary);
-    background: #fdfbff;
+    border-color: var(--primary);
     box-shadow: 0 0 0 3px rgba(124, 57, 191, 0.1);
 }
 
@@ -480,6 +496,8 @@ input:disabled + .slider {
 
 .v-label {
     color: var(--text);
+    flex: 1;
+    padding-right: 8px;
 }
 
 /* Анимация появления */
@@ -638,4 +656,9 @@ input:disabled + .slider {
     outline: none;
     border-color: var(--primary);
     background: #fdfbff;
+}
+
+/* FIX 4: Стиль для поля редактирования кол-ва документов */
+.inline-edit[data-type="docs-count"] {
+    width: 100px;
 }
