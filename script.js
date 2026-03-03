@@ -35,10 +35,10 @@ const CONSTANTS = {
         {
             id: 'setup', title: 'Удалённая настройка рабочего места',
             items: [
-                { id: 'sw1', label: 'Windows (nalog.ru или ЕСИА)', keyRef: 'setup_win_1' },
-                { id: 'sw2', label: 'Windows (nalog.ru и ЕСИА)', keyRef: 'setup_win_2' },
-                { id: 'sm1', label: 'MacOS (nalog.ru или ЕСИА)', keyRef: 'setup_mac_1' },
-                { id: 'sm2', label: 'MacOS (nalog.ru и ЕСИА)', keyRef: 'setup_mac_2' }
+                { id: 'sw1', label: 'Windows (nalog.ru <b>или</b> ЕСИА)', keyRef: 'setup_win_1' },
+                { id: 'sw2', label: 'Windows (nalog.ru <b>и</b> ЕСИА)', keyRef: 'setup_win_2' },
+                { id: 'sm1', label: 'MacOS (nalog.ru <b>или</b> ЕСИА)', keyRef: 'setup_mac_1' },
+                { id: 'sm2', label: 'MacOS (nalog.ru <b>и</b> ЕСИА)', keyRef: 'setup_mac_2' }
             ]
         },
         {
@@ -60,6 +60,7 @@ const State = {
         mainMode: 'typical',      // typical | project
         subMode: 'standard',      // standard | individual
         docsYearly: 0,
+        customDocsCount: null,    // null = auto from tariff, number = custom override
         pricing: [],
         customPrices: {},
         
@@ -81,14 +82,12 @@ const State = {
         addons: {},
     },
 
-    // Инициализация структуры допов
     initAddons() {
         CONSTANTS.ADDONS.forEach(addon => {
             this.data.addons[addon.id] = { enabled: false, values: {} };
         });
     },
 
-    // Геттеры для безопасного доступа к ценам
     getPrice(key) {
         if (!this.data.pricing.length || !key) return 0;
         return Helpers.parseNum(this.data.pricing[0][key]);
@@ -167,21 +166,30 @@ const Calculator = {
         const stdBase = State.getPrice(key);
         const stdUnit = State.getUnitPrice(key);
         
-        // Логика индивидуальной цены
         const customUnit = State.data.customPrices['unit'];
         const currentUnit = customUnit !== undefined ? customUnit : stdUnit;
+
+        // Если задано кастомное количество документов — используем его
+        const effectiveDocs = State.data.customDocsCount !== null ? State.data.customDocsCount : limitVal;
         
         const cost = (State.data.subMode === 'standard') 
             ? stdBase 
-            : (limitVal * currentUnit);
+            : (effectiveDocs * currentUnit);
+
+        // Если задано кастомное кол-во — строим динамическое имя тарифа
+        const displayDocs = State.data.customDocsCount !== null ? State.data.customDocsCount : limitVal;
+        const isCustomDocs = State.data.customDocsCount !== null && State.data.subMode === 'individual';
+        const displayKey = isCustomDocs
+            ? `1С-ЭПД ${Helpers.fmt(displayDocs)} документов`
+            : key.replace(/\n/g, ' ');
 
         const line = State.data.subMode === 'standard'
-            ? `Тариф: ${key.replace(/\n/g, ' ')} | ${Helpers.fmt(cost)} ₽`
-            : `Тариф: ${key.replace(/\n/g, ' ')} (Индив.) | ${Helpers.fmt(cost)} ₽`;
+            ? `Тариф: ${displayKey} | ${Helpers.fmt(cost)} ₽`
+            : `Тариф: ${displayKey} | ${Helpers.fmt(cost)} ₽`;
 
         return { 
             cost, line, 
-            meta: { key, limitVal, basePrice: cost, unitPrice: currentUnit } 
+            meta: { key, limitVal, basePrice: cost, unitPrice: currentUnit, effectiveDocs, displayKey } 
         };
     },
 
@@ -245,7 +253,6 @@ const Calculator = {
                 const sum = item.qty * price;
                 cost += sum;
                 
-                // Красивое название
                 const name = (type === 'base') ? 'МЧД Базовый' : 
                              (type === 'ext') ? 'МЧД Расширенный' :
                              (type === 'single') ? 'Одна МЧД' : 'Доп. МЧД';
@@ -266,7 +273,6 @@ const Calculator = {
                 addon.items.forEach(item => {
                     const qty = addonState.values[item.id] || 0;
                     if (qty > 0) {
-                        // ПРОВЕРКА: Если есть кастомная цена для этого ID
                         const customP = State.data.customPrices[item.keyRef];
                         const baseP = State.getPrice(CONSTANTS.KEYS.services[item.keyRef]);
                         
@@ -276,7 +282,9 @@ const Calculator = {
 
                         const sum = price * qty;
                         cost += sum;
-                        lines.push(`${item.label} x ${qty}: ${Helpers.fmt(sum)} ₽`);
+                        // Strip HTML tags for details line
+                        const labelText = item.label.replace(/<[^>]*>/g, '');
+                        lines.push(`${labelText} x ${qty}: ${Helpers.fmt(sum)} ₽`);
                     }
                 });
             }
@@ -289,7 +297,7 @@ const Calculator = {
  * 5. ОТРИСОВКА (UI)
  */
 const UI = {
-    els: {}, // Cache elements
+    els: {},
 
     init() {
         this.renderAddonsHTML();
@@ -298,7 +306,6 @@ const UI = {
     },
 
     cacheElements() {
-        // Кэшируем основные элементы для быстрого доступа
         const ids = ['dynamic-content', 'total-price', 'details-content', 'docs-month', 'docs-year', 
                      'card-basis', 'card-kcr', 'check-basis', 'check-kcr', 'ukep-qty'];
         ids.forEach(id => this.els[id] = document.getElementById(id));
@@ -313,7 +320,6 @@ const UI = {
         container.innerHTML = `<h3 class="section-title">Сервисные услуги</h3>` + CONSTANTS.ADDONS.map(addon => {
             const addonState = State.data.addons[addon.id];
             
-            // Блок изменения цен (появляется только в индив. режиме)
             const customPriceBlock = isInd ? `
                 <details class="card-price-details" style="margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px;">
                     <summary class="custom-price-summary">Изменить стоимость</summary>
@@ -321,9 +327,10 @@ const UI = {
                         ${addon.items.map(item => {
                             const savedPrice = State.data.customPrices[item.keyRef] || '';
                             const defaultPrice = State.getPrice(CONSTANTS.KEYS.services[item.keyRef]);
+                            const labelText = item.label.replace(/<[^>]*>/g, '');
                             return `
                             <div class="custom-price-row">
-                                <span>${item.label}</span>
+                                <span>${labelText}</span>
                                 <input type="number" min="0" value="${savedPrice}" placeholder="${defaultPrice}" 
                                     class="custom-price-input"
                                     onkeydown="if(['-', 'e', 'E', ',', '.'].includes(event.key)) event.preventDefault();" 
@@ -380,12 +387,16 @@ const UI = {
         const isProject = State.data.mainMode === 'project';
         const displayUnit = meta.unitPrice.toString().replace('.', ',');
         
-        // Инпут для цены
         const unitInputHtml = isInd
-            ? `<input type="text" class="inline-edit" value="${displayUnit}" data-action="custom-price" data-type="unit">`
+            ? `<input type="text" class="tariff-field-input" value="${displayUnit}" data-action="custom-price" data-type="unit">`
             : `<strong>${displayUnit}</strong>`;
             
-        // Инпут для проекта
+        // Custom docs count input (only in individual mode)
+        const customDocsVal = State.data.customDocsCount !== null ? State.data.customDocsCount : meta.limitVal;
+        const docsInputHtml = isInd
+            ? `<input type="number" class="tariff-field-input" min="1" value="${customDocsVal}" data-action="custom-price" data-type="docs-count">`
+            : `<strong>${Helpers.fmt(meta.limitVal)}</strong>`;
+
         let projectHtml = '';
         if (isProject) {
             const pPrice = State.data.customPrices['project'] !== undefined 
@@ -393,11 +404,11 @@ const UI = {
                 : State.getPrice(CONSTANTS.KEYS.project);
                 
             const pInput = isInd
-                ? `<input type="text" class="inline-edit" value="${pPrice.toString().replace('.', ',')}" data-action="custom-price" data-type="project">`
+                ? `<input type="text" class="tariff-field-input" value="${pPrice.toString().replace('.', ',')}" data-action="custom-price" data-type="project">`
                 : `<strong>${Helpers.fmt(pPrice)}</strong>`;
 
             projectHtml = `
-            <div class="detail-row project-row">
+            <div class="detail-row highlight">
                 <span>Проектное решение</span>
                 <div class="price-edit-block">${pInput}<span class="unit-text">₽</span></div>
             </div>`;
@@ -407,12 +418,16 @@ const UI = {
             <div class="tariff-card animated-fade ${isInd ? 'individual-mode' : ''}">
                 <div class="tariff-header">
                     <span class="tariff-label">${isInd ? 'Индивидуальные условия' : 'Стандарт'}</span>
-                    <h3 class="tariff-title">${meta.key.replace(/\n/g, ' ')}</h3>
+                    <h3 class="tariff-title">${meta.displayKey || meta.key.replace(/\n/g, ' ')}</h3>
                 </div>
                 <div class="detailing-section">
                     <div class="detail-row">
-                        <span>Пакет (${meta.limitVal} шт.)</span>
-                        <strong>${Helpers.fmt(meta.basePrice)} ₽</strong>
+                        <span>Пакет (документов)</span>
+                        <div class="price-edit-block">${docsInputHtml}<span class="unit-text">шт.</span></div>
+                    </div>
+                    <div class="detail-row">
+                        <span>Стоимость пакета</span>
+                        <div class="price-edit-block"><strong>${Helpers.fmt(meta.basePrice)}</strong><span class="unit-text">₽</span></div>
                     </div>
                     <div class="detail-row highlight">
                         <span>Цена за 1 документ</span>
@@ -428,28 +443,22 @@ const UI = {
         const isLocked = d.ukepQty < 6;
         const isInd = State.data.subMode === 'individual';
         
-        // Если КЦР заблокировался (кол-во < 6), а он был выбран — сбрасываем выбор
         if (isLocked && d.sigType === 'kcr') {
             State.data.sigType = null;
         }
 
         this.els['card-kcr'].classList.toggle('locked', isLocked);
-        
-        // Карточки подсвечиваются только если sigType совпадает
         this.els['card-basis'].classList.toggle('active', d.sigType === 'basis');
         this.els['card-kcr'].classList.toggle('active', d.sigType === 'kcr');
         
-        // Показываем поля КЦР внутри карточки
         const kcrOptionsContainer = document.getElementById('kcr-options-container');
         if (kcrOptionsContainer) {
             kcrOptionsContainer.style.display = (d.sigType === 'kcr') ? 'block' : 'none';
         }
         
-        // Слайдеры отражают текущее состояние
         this.els['check-basis'].checked = (d.sigType === 'basis');
         this.els['check-kcr'].checked = (d.sigType === 'kcr');
 
-        // Обновляем кнопки периода
         const btn12 = document.querySelector('[data-click="set-ukep-period"][data-val="12"]');
         const btn15 = document.querySelector('[data-click="set-ukep-period"][data-val="15"]');
         if (btn12 && btn15) {
@@ -457,7 +466,6 @@ const UI = {
             btn15.classList.toggle('selected', d.ukepPeriod === 15);
         }
 
-        // Обновляем блоки с кастомными ценами для каждой карточки
         this.updateBasisPricing(isInd);
         this.updateKCRPricing(isInd);
         this.updateMCHDPricing(isInd);
@@ -558,7 +566,6 @@ const UI = {
             return;
         }
 
-        // Обновляем каждую карточку МЧД
         const mchdTypes = [
             { id: 'base', key: CONSTANTS.KEYS.mchd.base, name: 'Базовый' },
             { id: 'ext', key: CONSTANTS.KEYS.mchd.ext, name: 'Расширенный' },
@@ -590,7 +597,6 @@ const UI = {
     },
 
     bindEvents() {
-        // Делегирование событий
         document.body.addEventListener('input', (e) => this.handleInput(e));
         document.body.addEventListener('change', (e) => this.handleChange(e));
         document.body.addEventListener('click', (e) => this.handleClick(e));
@@ -603,11 +609,13 @@ const UI = {
 
         if (act === 'docs-month') {
             State.data.docsYearly = (parseInt(val)||0) * 12;
+            State.data.customDocsCount = null;
             this.els['docs-year'].value = State.data.docsYearly;
             this.update();
         } 
         else if (act === 'docs-year') {
             State.data.docsYearly = parseInt(val)||0;
+            State.data.customDocsCount = null;
             this.els['docs-month'].value = Math.round(State.data.docsYearly / 12);
             this.update();
         }
@@ -616,7 +624,7 @@ const UI = {
             this.update();
         }
         else if (act === 'kcr-qty') {
-            const field = t.dataset.field; // egais, univ, basis
+            const field = t.dataset.field;
             State.data.kcrDetails[field] = Math.max(0, parseInt(val)||0);
             this.update();
         }
@@ -638,24 +646,27 @@ const UI = {
 
         if (act === 'custom-price') {
             const type = t.dataset.type;
-            const floatVal = parseFloat(t.value.replace(',', '.')) || 0;
-            State.data.customPrices[type] = floatVal;
-            this.update();
+            if (type === 'docs-count') {
+                const num = parseInt(t.value) || null;
+                State.data.customDocsCount = num && num > 0 ? num : null;
+                this.update();
+            } else {
+                const floatVal = parseFloat(t.value.replace(',', '.')) || 0;
+                State.data.customPrices[type] = floatVal;
+                this.update();
+            }
         }
         else if (act === 'toggle-sig') {
-            const type = t.dataset.val; // basis | kcr
+            const type = t.dataset.val;
             const checked = t.checked;
             
-            // Если включили — устанавливаем этот тип, если выключили — сбрасываем
             if (checked) {
-                // Проверяем доступность КЦР
                 if (type === 'kcr' && State.data.ukepQty < 6) {
                     t.checked = false;
                     return;
                 }
                 State.data.sigType = type;
             } else {
-                // Выключили — сбрасываем только если это был активный тип
                 if (State.data.sigType === type) {
                     State.data.sigType = null;
                 }
@@ -668,7 +679,6 @@ const UI = {
             const checked = t.checked;
             State.data.mchd[type].active = checked;
             
-            // Активация UI
             document.getElementById(`card-mchd-${type}`).classList.toggle('active', checked);
             if (checked && State.data.mchd[type].qty === 0) {
                 State.data.mchd[type].qty = 1;
@@ -705,9 +715,11 @@ const UI = {
             t.classList.add('selected');
             
             State.data.subMode = t.dataset.val;
-            if (State.data.subMode === 'standard') State.data.customPrices = {};
+            if (State.data.subMode === 'standard') {
+                State.data.customPrices = {};
+                State.data.customDocsCount = null;
+            }
             
-            // Перерисовываем допы при смене режима
             this.renderAddonsHTML();
             this.update();
         }
@@ -726,7 +738,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     State.initAddons();
     UI.init();
     
-    // Восстановление контактных данных из localStorage
     const contactFields = ['partner-name', 'partner-phone', 'partner-email', 'client-name'];
     contactFields.forEach(fieldId => {
         const saved = localStorage.getItem(`epd-${fieldId}`);
@@ -734,7 +745,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (saved && element) {
             element.value = saved;
         }
-        // Сохранение при изменении
         if (element) {
             element.addEventListener('input', (e) => {
                 localStorage.setItem(`epd-${fieldId}`, e.target.value);
@@ -742,7 +752,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    // Загрузка JSON
     try {
         const res = await fetch('Цены для калькулятора ЭПД.json');
         const text = await res.text();
@@ -829,41 +838,39 @@ window.downloadKP = async () => {
             const { title, price } = parseLine(line);
             if (price) {
                 return `<tr>
-                    <td style="padding:2px 0;font-size:10pt;color:#1a1a2e;border-bottom:1px solid #ede8ff;">${title}</td>
-                    <td style="padding:2px 0;text-align:right;font-weight:700;color:#7c3aed;font-size:10pt;white-space:nowrap;border-bottom:1px solid #ede8ff;">${price}</td>
+                    <td style="padding:6px 8px 6px 0;font-size:9.5pt;color:#1a1a2e;border-bottom:1px solid #ede8ff;word-break:break-word;max-width:360px;line-height:1.4;">${title}</td>
+                    <td style="padding:6px 0 6px 8px;text-align:right;font-weight:700;color:#7c3aed;font-size:9.5pt;white-space:nowrap;border-bottom:1px solid #ede8ff;vertical-align:top;">${price}</td>
                 </tr>`;
             }
             return `<tr>
-                <td colspan="2" style="padding:2px 0;font-size:10pt;color:#1a1a2e;border-bottom:1px solid #ede8ff;">${title}</td>
+                <td colspan="2" style="padding:6px 0;font-size:9.5pt;color:#1a1a2e;border-bottom:1px solid #ede8ff;word-break:break-word;line-height:1.4;">${title}</td>
             </tr>`;
         }).join('');
     }
 
     const summaryBlock = `
-        <div style="background:#f3f0ff;border-radius:10px;padding:20px 28px;margin-top:18px;text-align:center;">
-            <div style="font-size:10pt;color:#6d28d9;margin-bottom:6px;">
+        <div style="background:#f3f0ff;border-radius:10px;padding:16px 28px;margin-top:14px;text-align:center;">
+            <div style="font-size:9.5pt;color:#6d28d9;margin-bottom:6px;">
                 Стоимость для ${clientName}:
             </div>
-            <div style="font-size:22pt;font-weight:800;color:#7c3aed;letter-spacing:-0.5px;">
+            <div style="font-size:20pt;font-weight:800;color:#7c3aed;letter-spacing:-0.5px;">
                 ${Helpers.fmt(result.total)} ₽
             </div>
         </div>`;
 
-    // Определяем URL для гиперссылки
     const helpUrl = isTypical 
         ? 'https://astral.ru/help/1s-epd/1s-epd-tipovoe-reshenie/obshchaya-informatsiya/nachalo-raboty-s-1s-epd/'
         : 'https://astral.ru/help/1s-epd/1s-epd-proektnoe-reshenie/';
 
-    // Блок контактов с кликабельной ссылкой
     const contactBlock = `
-        <div style="border:1px solid #ede8ff;border-radius:10px;padding:16px 24px;margin-top:14px;display:flex;justify-content:space-between;align-items:center;">
+        <div style="border:1px solid #ede8ff;border-radius:10px;padding:14px 20px;margin-top:12px;display:flex;justify-content:space-between;align-items:center;">
             <div>
-                <div style="font-size:12pt;font-weight:700;margin-bottom:4px;">
+                <div style="font-size:11pt;font-weight:700;margin-bottom:4px;">
                     <a href="${helpUrl}" style="color:#7c3aed;text-decoration:underline;" target="_blank">Как подключиться</a>
                 </div>
-                <div style="font-size:9pt;color:#888;">Свяжитесь с нами, чтобы подключить сервис</div>
+                <div style="font-size:8.5pt;color:#888;">Свяжитесь с нами, чтобы подключить сервис</div>
             </div>
-            <div style="text-align:right;font-size:9.5pt;color:#1a1a2e;line-height:1.7;">
+            <div style="text-align:right;font-size:9pt;color:#1a1a2e;line-height:1.7;">
                 ${partnerName  ? `<div style="font-weight:600;">${partnerName}</div>`  : ''}
                 ${partnerPhone ? `<div>${partnerPhone}</div>` : ''}
                 ${partnerEmail ? `<div>${partnerEmail}</div>` : ''}
@@ -873,9 +880,13 @@ window.downloadKP = async () => {
     const page1HTML = `
         <div style="width:794px;background:#fff;box-sizing:border-box;">
             ${b64Header ? `<img src="${b64Header}" style="width:794px;display:block;">` : ''}
-            <div style="padding:22px 50px 36px;">
-                <div style="font-size:13pt;font-weight:800;color:#7c3aed;margin-bottom:12px;">Стоимость подключения:</div>
-                <table style="width:100%;border-collapse:collapse;">
+            <div style="padding:18px 44px 30px;">
+                <div style="font-size:12pt;font-weight:800;color:#7c3aed;margin-bottom:10px;">Стоимость подключения:</div>
+                <table style="width:100%;border-collapse:collapse;table-layout:fixed;">
+                    <colgroup>
+                        <col style="width:70%">
+                        <col style="width:30%">
+                    </colgroup>
                     <tbody>${buildRows(lines)}</tbody>
                 </table>
                 ${summaryBlock}
@@ -896,7 +907,7 @@ window.downloadKP = async () => {
     const PDF_W = 595.28;
     const PDF_H = 841.89;
     
-    let linkCoordinates = null; // Координаты ссылки для PDF
+    let linkCoordinates = null;
 
     async function renderPageToCanvas(htmlContent, pageIndex) {
         const div = document.createElement('div');
@@ -906,23 +917,19 @@ window.downloadKP = async () => {
 
         await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
-        // Если это первая страница, находим координаты ссылки
         if (pageIndex === 0) {
             const linkElement = div.querySelector('a[href*="astral.ru"]');
             if (linkElement) {
                 const rect = linkElement.getBoundingClientRect();
                 const divRect = div.getBoundingClientRect();
                 
-                // Вычисляем относительные координаты внутри div
                 const relativeX = rect.left - divRect.left;
                 const relativeY = rect.top - divRect.top;
                 
-                // Конвертируем из px (794px ширина) в pt (595.28pt ширина PDF)
                 const scaleX = PDF_W / 794;
-                const scaleY = PDF_W / 794; // Используем тот же масштаб
+                const scaleY = PDF_W / 794;
                 
-                
-                const pad = 4; // px отступ в PDF-координатах
+                const pad = 4;
                 linkCoordinates = {
                     x: relativeX * scaleX - pad,
                     y: relativeY * scaleY - pad,
@@ -969,7 +976,6 @@ window.downloadKP = async () => {
             if (i > 0) doc.addPage();
             doc.addImage(imgData, 'JPEG', 0, 0, PDF_W, Math.min(imgH, PDF_H));
             
-            // Добавляем кликабельную ссылку на первой странице
             if (i === 0 && linkCoordinates) {
                 doc.link(
                     linkCoordinates.x, 
@@ -981,7 +987,8 @@ window.downloadKP = async () => {
             }
         }
 
-        doc.save(`КП_${clientName}.pdf`);
+        // FIX 2: Название файла "КП Астрал.ЭПД для <Клиент>"
+        doc.save(`КП Астрал.ЭПД для ${clientName}.pdf`);
 
     } catch (err) {
         console.error('Ошибка PDF:', err);
