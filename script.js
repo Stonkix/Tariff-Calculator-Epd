@@ -115,6 +115,82 @@ const Helpers = {
  * 4. ЛОГИКА РАСЧЕТА (CALCULATOR)
  */
 const Calculator = {
+    /** НОВАЯ ФУНКЦИЯ — оптимальная комбинация пакетов */
+    getOptimalTariff(targetDocs) {
+        if (targetDocs <= 0) {
+            return { cost: 0, packages: [], totalDocs: 0, displayKey: '' };
+        }
+
+        const tariffKeys = CONSTANTS.KEYS.tariffs;
+        const pkgs = tariffKeys.map((key, i) => ({
+            key: key,
+            displayName: key.replace(/\n/g, ' ').replace(/ +/g, ' ').trim(),
+            docs: CONSTANTS.LIMITS[i],
+            price: State.getPrice(key)
+        }));
+
+        const MAX = Math.max(targetDocs + 100000, 200000);
+        let dp = new Array(MAX + 1).fill(Infinity);
+        dp[0] = 0;
+        let prev = new Array(MAX + 1).fill(null);
+
+        for (let p = 0; p < pkgs.length; p++) {
+            const pkg = pkgs[p];
+            for (let j = pkg.docs; j <= MAX; j++) {
+                if (dp[j - pkg.docs] !== Infinity) {
+                    const newCost = dp[j - pkg.docs] + pkg.price;
+                    if (newCost < dp[j]) {
+                        dp[j] = newCost;
+                        prev[j] = { pkgIdx: p, prevDocs: j - pkg.docs };
+                    }
+                }
+            }
+        }
+
+        let minCost = Infinity;
+        let bestJ = targetDocs;
+        for (let j = targetDocs; j <= MAX; j++) {
+            if (dp[j] < minCost) {
+                minCost = dp[j];
+                bestJ = j;
+            }
+        }
+
+        // Реконструкция комбинации
+        let used = new Array(pkgs.length).fill(0);
+        let curr = bestJ;
+        while (curr > 0 && prev[curr]) {
+            const pr = prev[curr];
+            used[pr.pkgIdx]++;
+            curr = pr.prevDocs;
+        }
+
+        let packages = [];
+        let totalD = 0;
+        for (let i = 0; i < pkgs.length; i++) {
+            if (used[i] > 0) {
+                const pkg = pkgs[i];
+                const subPrice = pkg.price * used[i];
+                packages.push({
+                    name: pkg.displayName,
+                    qty: used[i],
+                    price: subPrice
+                });
+                totalD += pkg.docs * used[i];
+            }
+        }
+
+        const displayKey = (packages.length === 1 && packages[0].qty === 1)
+            ? packages[0].name
+            : `Комбинация пакетов (${Helpers.fmt(totalD)} док.)`;
+
+        return {
+            cost: minCost,
+            packages: packages,
+            totalDocs: totalD,
+            displayKey: displayKey
+        };
+    },
     calculateAll() {
         if (!State.data.pricing.length) return { total: 0, lines: [] };
 
@@ -156,43 +232,78 @@ const Calculator = {
     calcTariff() {
         if (State.data.docsYearly <= 0) return { cost: 0, line: null, meta: null };
 
-        const limits = CONSTANTS.LIMITS;
-        let idx = limits.findIndex(l => l >= State.data.docsYearly);
-        const finalIdx = idx === -1 ? limits.length - 1 : idx;
-        
-        const key = CONSTANTS.KEYS.tariffs[finalIdx];
-        const limitVal = limits[finalIdx];
-        
-        const stdBase = State.getPrice(key);
-        const stdUnit = State.getUnitPrice(key);
-        
-        const customUnit = State.data.customPrices['unit'];
-        const currentUnit = customUnit !== undefined ? customUnit : stdUnit;
+        if (State.data.subMode === 'individual') {
+            // === СТАРЫЙ КОД ДЛЯ ИНДИВИДУАЛЬНОГО РЕЖИМА (без изменений) ===
+            const limits = CONSTANTS.LIMITS;
+            let idx = limits.findIndex(l => l >= State.data.docsYearly);
+            const finalIdx = idx === -1 ? limits.length - 1 : idx;
+            
+            const key = CONSTANTS.KEYS.tariffs[finalIdx];
+            const limitVal = limits[finalIdx];
+            
+            const stdUnit = State.getUnitPrice(key);
+            const customUnit = State.data.customPrices['unit'];
+            const currentUnit = customUnit !== undefined ? customUnit : stdUnit;
 
-        // Если задано кастомное количество документов — используем его
-        const effectiveDocs = State.data.customDocsCount !== null ? State.data.customDocsCount : limitVal;
-        
-        const cost = (State.data.subMode === 'standard') 
-            ? stdBase 
-            : (effectiveDocs * currentUnit);
+            const effectiveDocs = State.data.customDocsCount !== null ? State.data.customDocsCount : limitVal;
+            
+            const cost = effectiveDocs * currentUnit;
 
-        // Если задано кастомное кол-во — строим динамическое имя тарифа
-        const displayDocs = State.data.customDocsCount !== null ? State.data.customDocsCount : limitVal;
-        const isCustomDocs = State.data.customDocsCount !== null && State.data.subMode === 'individual';
-        const displayKey = isCustomDocs
-            ? `1С-ЭПД ${Helpers.fmt(displayDocs)} документов`
-            : key.replace(/\n/g, ' ');
+            const displayDocs = State.data.customDocsCount !== null ? State.data.customDocsCount : limitVal;
+            const displayKey = State.data.customDocsCount !== null
+                ? `1С-ЭПД ${Helpers.fmt(displayDocs)} документов`
+                : key.replace(/\n/g, ' ');
 
-        const line = State.data.subMode === 'standard'
-            ? `Тариф: ${displayKey} | ${Helpers.fmt(cost)} ₽`
-            : `Тариф: ${displayKey} | ${Helpers.fmt(cost)} ₽`;
+            const line = `Тариф: ${displayKey} | ${Helpers.fmt(cost)} ₽`;
 
-        return { 
-            cost, line, 
-            meta: { key, limitVal, basePrice: cost, unitPrice: currentUnit, effectiveDocs, displayKey } 
-        };
+            return { 
+                cost, line, 
+                meta: { key, limitVal, basePrice: cost, unitPrice: currentUnit, effectiveDocs, displayKey } 
+            };
+    } else {
+            // Стандартный режим — оптимальная комбинация
+            const opt = this.getOptimalTariff(State.data.docsYearly);
+            const cost = opt.cost;
+
+            // ───────────────────────────────────────────────
+            // 1. Для карточки тарифа — считаем цену за документ
+            // ───────────────────────────────────────────────
+            let pricePerDoc = 0;
+            if (opt.totalDocs > 0) {
+                pricePerDoc = Math.round(cost / opt.totalDocs);
+            }
+
+            // ───────────────────────────────────────────────
+            // 2. Для детализации — готовим отдельные строки по каждому пакету
+            // ───────────────────────────────────────────────
+            const detailLines = opt.packages.map(pkg => {
+                return `${pkg.name} × ${pkg.qty} = ${Helpers.fmt(pkg.price)} ₽`;
+            });
+
+            // Можно добавить итоговую строку, если хочется
+            detailLines.push(`Всего документов: ${Helpers.fmt(opt.totalDocs)} шт.`);
+            detailLines.push(`Стоимость тарифа: ${Helpers.fmt(cost)} ₽`);
+            if (pricePerDoc > 0) {
+                detailLines.push(`Стоимость за 1 документ: ${Helpers.fmt(pricePerDoc)} ₽`);
+            }
+
+            // Сама строка для КП (lines) теперь будет содержать все эти строки
+            const linesForKP = detailLines.map(line => `Тариф: ${line}`);
+
+            return { 
+                cost, 
+                line: linesForKP[0] || `Тариф: ${opt.displayKey} | ${Helpers.fmt(cost)} ₽`,  // первая строка для старой логики
+                meta: { 
+                    basePrice: cost, 
+                    totalDocs: opt.totalDocs,
+                    packages: opt.packages,
+                    pricePerDoc: pricePerDoc,
+                    displayKey: opt.displayKey,
+                    detailLines: detailLines   // ← вот это главное для детализации
+                } 
+            };
+        }
     },
-
     calcSignatures() {
         const d = State.data;
         let cost = 0;
@@ -385,54 +496,91 @@ const UI = {
 
         const isInd = State.data.subMode === 'individual';
         const isProject = State.data.mainMode === 'project';
-        const displayUnit = meta.unitPrice.toString().replace('.', ',');
-        
-        const unitInputHtml = isInd
-            ? `<input type="text" class="tariff-field-input" value="${displayUnit}" data-action="custom-price" data-type="unit">`
-            : `<strong>${displayUnit}</strong>`;
-            
-        // Custom docs count input (only in individual mode)
-        const customDocsVal = State.data.customDocsCount !== null ? State.data.customDocsCount : meta.limitVal;
-        const docsInputHtml = isInd
-            ? `<input type="number" class="tariff-field-input" min="1" value="${customDocsVal}" data-action="custom-price" data-type="docs-count">`
-            : `<strong>${Helpers.fmt(meta.limitVal)}</strong>`;
+
+        let tariffHTML = '';
+
+        if (isInd) {
+            // Индивидуальный режим — оставлен как был
+            const displayUnit = meta.unitPrice.toString().replace('.', ',');
+            const unitInputHtml = `<input type="text" class="tariff-field-input" value="${displayUnit}" data-action="custom-price" data-type="unit">`;
+            const customDocsVal = State.data.customDocsCount !== null ? State.data.customDocsCount : meta.limitVal;
+            const docsInputHtml = `<input type="number" class="tariff-field-input" min="1" value="${customDocsVal}" data-action="custom-price" data-type="docs-count">`;
+
+            tariffHTML = `
+                <div class="detail-row">
+                    <span>Пакет (документов)</span>
+                    <div class="price-edit-block">${docsInputHtml}<span class="unit-text">шт.</span></div>
+                </div>
+                <div class="detail-row">
+                    <span>Стоимость пакета</span>
+                    <div class="price-edit-block"><strong>${Helpers.fmt(meta.basePrice)}</strong><span class="unit-text">₽</span></div>
+                </div>
+                <div class="detail-row highlight">
+                    <span>Цена за 1 документ</span>
+                    <div class="price-edit-block">${unitInputHtml}<span class="unit-text">₽</span></div>
+                </div>`;
+        } else {
+            // Стандартный режим — показываем подобранные пакеты
+            let packagesRows = meta.packages.map(p => `
+                <div class="detail-row">
+                    <span>${p.qty > 1 ? p.qty + ' × ' : ''}${p.name}</span>
+                    <div class="price-edit-block"><strong>${Helpers.fmt(p.price)}</strong><span class="unit-text">₽</span></div>
+                </div>
+            `).join('');
+
+            let pricePerDocRow = '';
+            if (meta.pricePerDoc > 0) {
+                pricePerDocRow = `
+                    <div class="detail-row highlight">
+                        <span>Стоимость за 1 документ</span>
+                        <div class="price-edit-block"><strong>${Helpers.fmt(meta.pricePerDoc)}</strong><span class="unit-text">₽</span></div>
+                    </div>`;
+            }
+
+            tariffHTML = packagesRows + `
+                <div class="detail-row highlight">
+                    <span>Всего документов</span>
+                    <div class="price-edit-block"><strong>${Helpers.fmt(meta.totalDocs)}</strong><span class="unit-text">шт.</span></div>
+                </div>
+                <div class="detail-row highlight">
+                    <span>Стоимость тарифа</span>
+                    <div class="price-edit-block"><strong>${Helpers.fmt(meta.basePrice)}</strong><span class="unit-text">₽</span></div>
+                </div>
+                ${pricePerDocRow}`;
+        }
 
         let projectHtml = '';
         if (isProject) {
             const pPrice = State.data.customPrices['project'] !== undefined 
                 ? State.data.customPrices['project'] 
                 : State.getPrice(CONSTANTS.KEYS.project);
-                
             const pInput = isInd
                 ? `<input type="text" class="tariff-field-input" value="${pPrice.toString().replace('.', ',')}" data-action="custom-price" data-type="project">`
                 : `<strong>${Helpers.fmt(pPrice)}</strong>`;
 
             projectHtml = `
-            <div class="detail-row highlight">
-                <span>Проектное решение</span>
-                <div class="price-edit-block">${pInput}<span class="unit-text">₽</span></div>
-            </div>`;
+                <div class="detail-row project-row">
+                    <span>Проектное решение</span>
+                    <div class="price-edit-block">${pInput}<span class="unit-text">₽</span></div>
+                </div>`;
         }
+
+        const labelText = isInd 
+            ? 'Индивидуальные условия' 
+            : (meta.packages.length > 1 || (meta.packages.length === 1 && meta.packages[0].qty > 1) 
+                ? 'Оптимальная комбинация' 
+                : 'Стандартный тариф');
+
+        const titleText = isInd ? meta.displayKey : meta.displayKey;
 
         container.innerHTML = `
             <div class="tariff-card animated-fade ${isInd ? 'individual-mode' : ''}">
                 <div class="tariff-header">
-                    <span class="tariff-label">${isInd ? 'Индивидуальные условия' : 'Стандарт'}</span>
-                    <h3 class="tariff-title">${meta.displayKey || meta.key.replace(/\n/g, ' ')}</h3>
+                    <span class="tariff-label">${labelText}</span>
+                    <h3 class="tariff-title">${titleText}</h3>
                 </div>
                 <div class="detailing-section">
-                    <div class="detail-row">
-                        <span>Пакет (документов)</span>
-                        <div class="price-edit-block">${docsInputHtml}<span class="unit-text">шт.</span></div>
-                    </div>
-                    <div class="detail-row">
-                        <span>Стоимость пакета</span>
-                        <div class="price-edit-block"><strong>${Helpers.fmt(meta.basePrice)}</strong><span class="unit-text">₽</span></div>
-                    </div>
-                    <div class="detail-row highlight">
-                        <span>Цена за 1 документ</span>
-                        <div class="price-edit-block">${unitInputHtml}<span class="unit-text">₽</span></div>
-                    </div>
+                    ${tariffHTML}
                     ${projectHtml}
                 </div>
             </div>`;
