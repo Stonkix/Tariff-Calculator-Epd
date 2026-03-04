@@ -39,10 +39,6 @@ const CONSTANTS = {
                 { id: 'sw2', label: 'Windows (nalog.ru <b>и</b> ЕСИА)', keyRef: 'setup_win_2' },
                 { id: 'sm1', label: 'MacOS (nalog.ru <b>или</b> ЕСИА)', keyRef: 'setup_mac_1' },
                 { id: 'sm2', label: 'MacOS (nalog.ru <b>и</b> ЕСИА)', keyRef: 'setup_mac_2' }
-                { id: 'sw1', label: 'Windows (nalog.ru <b>или</b> ЕСИА)', keyRef: 'setup_win_1' },
-                { id: 'sw2', label: 'Windows (nalog.ru <b>и</b> ЕСИА)', keyRef: 'setup_win_2' },
-                { id: 'sm1', label: 'MacOS (nalog.ru <b>или</b> ЕСИА)', keyRef: 'setup_mac_1' },
-                { id: 'sm2', label: 'MacOS (nalog.ru <b>и</b> ЕСИА)', keyRef: 'setup_mac_2' }
             ]
         },
         {
@@ -64,7 +60,6 @@ const State = {
         mainMode: 'typical',
         subMode: 'standard',
         docsYearly: 0,
-        customDocsCount: null,    // null = auto from tariff, number = custom override
         customDocsCount: null,
         pricing: [],
         customPrices: {},
@@ -119,82 +114,6 @@ const Helpers = {
  * 4. ЛОГИКА РАСЧЕТА (CALCULATOR)
  */
 const Calculator = {
-    /** НОВАЯ ФУНКЦИЯ — оптимальная комбинация пакетов */
-    getOptimalTariff(targetDocs) {
-        if (targetDocs <= 0) {
-            return { cost: 0, packages: [], totalDocs: 0, displayKey: '' };
-        }
-
-        const tariffKeys = CONSTANTS.KEYS.tariffs;
-        const pkgs = tariffKeys.map((key, i) => ({
-            key: key,
-            displayName: key.replace(/\n/g, ' ').replace(/ +/g, ' ').trim(),
-            docs: CONSTANTS.LIMITS[i],
-            price: State.getPrice(key)
-        }));
-
-        const MAX = Math.max(targetDocs + 100000, 200000);
-        let dp = new Array(MAX + 1).fill(Infinity);
-        dp[0] = 0;
-        let prev = new Array(MAX + 1).fill(null);
-
-        for (let p = 0; p < pkgs.length; p++) {
-            const pkg = pkgs[p];
-            for (let j = pkg.docs; j <= MAX; j++) {
-                if (dp[j - pkg.docs] !== Infinity) {
-                    const newCost = dp[j - pkg.docs] + pkg.price;
-                    if (newCost < dp[j]) {
-                        dp[j] = newCost;
-                        prev[j] = { pkgIdx: p, prevDocs: j - pkg.docs };
-                    }
-                }
-            }
-        }
-
-        let minCost = Infinity;
-        let bestJ = targetDocs;
-        for (let j = targetDocs; j <= MAX; j++) {
-            if (dp[j] < minCost) {
-                minCost = dp[j];
-                bestJ = j;
-            }
-        }
-
-        // Реконструкция комбинации
-        let used = new Array(pkgs.length).fill(0);
-        let curr = bestJ;
-        while (curr > 0 && prev[curr]) {
-            const pr = prev[curr];
-            used[pr.pkgIdx]++;
-            curr = pr.prevDocs;
-        }
-
-        let packages = [];
-        let totalD = 0;
-        for (let i = 0; i < pkgs.length; i++) {
-            if (used[i] > 0) {
-                const pkg = pkgs[i];
-                const subPrice = pkg.price * used[i];
-                packages.push({
-                    name: pkg.displayName,
-                    qty: used[i],
-                    price: subPrice
-                });
-                totalD += pkg.docs * used[i];
-            }
-        }
-
-        const displayKey = (packages.length === 1 && packages[0].qty === 1)
-            ? packages[0].name
-            : `Комбинация пакетов (${Helpers.fmt(totalD)} док.)`;
-
-        return {
-            cost: minCost,
-            packages: packages,
-            totalDocs: totalD,
-            displayKey: displayKey
-        };
-    },
     getOptimalTariff(targetDocs) {
         if (targetDocs <= 0) {
             return { cost: 0, packages: [], totalDocs: 0, displayKey: '' };
@@ -313,29 +232,6 @@ const Calculator = {
         if (State.data.docsYearly <= 0) return { cost: 0, line: null, lines: [], meta: null };
 
         if (State.data.subMode === 'individual') {
-            // === СТАРЫЙ КОД ДЛЯ ИНДИВИДУАЛЬНОГО РЕЖИМА (без изменений) ===
-            const limits = CONSTANTS.LIMITS;
-            let idx = limits.findIndex(l => l >= State.data.docsYearly);
-            const finalIdx = idx === -1 ? limits.length - 1 : idx;
-            
-            const key = CONSTANTS.KEYS.tariffs[finalIdx];
-            const limitVal = limits[finalIdx];
-            
-            const stdUnit = State.getUnitPrice(key);
-            const customUnit = State.data.customPrices['unit'];
-            const currentUnit = customUnit !== undefined ? customUnit : stdUnit;
-
-            const effectiveDocs = State.data.customDocsCount !== null ? State.data.customDocsCount : limitVal;
-            
-            const cost = effectiveDocs * currentUnit;
-
-            const displayDocs = State.data.customDocsCount !== null ? State.data.customDocsCount : limitVal;
-            const displayKey = State.data.customDocsCount !== null
-                ? `1С-ЭПД ${Helpers.fmt(displayDocs)} документов`
-                : key.replace(/\n/g, ' ');
-
-            const line = `Тариф: ${displayKey} | ${Helpers.fmt(cost)} ₽`;
-        if (State.data.subMode === 'individual') {
             const limits = CONSTANTS.LIMITS;
             let idx = limits.findIndex(l => l >= State.data.docsYearly);
             const finalIdx = idx === -1 ? limits.length - 1 : idx;
@@ -357,54 +253,6 @@ const Calculator = {
 
             const line = `Тариф: ${displayKey} | ${Helpers.fmt(cost)} ₽`;
 
-            return { 
-                cost, line, 
-                meta: { key, limitVal, basePrice: cost, unitPrice: currentUnit, effectiveDocs, displayKey } 
-            };
-    } else {
-            // Стандартный режим — оптимальная комбинация
-            const opt = this.getOptimalTariff(State.data.docsYearly);
-            const cost = opt.cost;
-
-            // ───────────────────────────────────────────────
-            // 1. Для карточки тарифа — считаем цену за документ
-            // ───────────────────────────────────────────────
-            let pricePerDoc = 0;
-            if (opt.totalDocs > 0) {
-                pricePerDoc = Math.round(cost / opt.totalDocs);
-            }
-
-            // ───────────────────────────────────────────────
-            // 2. Для детализации — готовим отдельные строки по каждому пакету
-            // ───────────────────────────────────────────────
-            const detailLines = opt.packages.map(pkg => {
-                return `${pkg.name} × ${pkg.qty} = ${Helpers.fmt(pkg.price)} ₽`;
-            });
-
-            // Можно добавить итоговую строку, если хочется
-            detailLines.push(`Всего документов: ${Helpers.fmt(opt.totalDocs)} шт.`);
-            detailLines.push(`Стоимость тарифа: ${Helpers.fmt(cost)} ₽`);
-            if (pricePerDoc > 0) {
-                detailLines.push(`Стоимость за 1 документ: ${Helpers.fmt(pricePerDoc)} ₽`);
-            }
-
-            // Сама строка для КП (lines) теперь будет содержать все эти строки
-            const linesForKP = detailLines.map(line => `Тариф: ${line}`);
-
-            return { 
-                cost, 
-                line: linesForKP[0] || `Тариф: ${opt.displayKey} | ${Helpers.fmt(cost)} ₽`,  // первая строка для старой логики
-                meta: { 
-                    basePrice: cost, 
-                    totalDocs: opt.totalDocs,
-                    packages: opt.packages,
-                    pricePerDoc: pricePerDoc,
-                    displayKey: opt.displayKey,
-                    detailLines: detailLines   // ← вот это главное для детализации
-                } 
-            };
-        }
-    },
             return { 
                 cost, line, lines: [line],
                 meta: { key, limitVal, basePrice: cost, unitPrice: currentUnit, effectiveDocs, displayKey } 
@@ -529,9 +377,6 @@ const Calculator = {
 
                         const sum = price * qty;
                         cost += sum;
-                        // Strip HTML tags for details line
-                        const labelText = item.label.replace(/<[^>]*>/g, '');
-                        lines.push(`${labelText} x ${qty}: ${Helpers.fmt(sum)} ₽`);
                         const labelText = item.label.replace(/<[^>]*>/g, '');
                         lines.push(`${labelText} x ${qty}: ${Helpers.fmt(sum)} ₽`);
                     }
@@ -546,7 +391,6 @@ const Calculator = {
  * 5. ОТРИСОВКА (UI)
  */
 const UI = {
-    els: {},
     els: {},
 
     init() {
@@ -578,10 +422,8 @@ const UI = {
                             const savedPrice = State.data.customPrices[item.keyRef] || '';
                             const defaultPrice = State.getPrice(CONSTANTS.KEYS.services[item.keyRef]);
                             const labelText = item.label.replace(/<[^>]*>/g, '');
-                            const labelText = item.label.replace(/<[^>]*>/g, '');
                             return `
                             <div class="custom-price-row">
-                                <span>${labelText}</span>
                                 <span>${labelText}</span>
                                 <input type="number" min="0" value="${savedPrice}" placeholder="${defaultPrice}" 
                                     class="custom-price-input"
@@ -637,59 +479,6 @@ const UI = {
 
         const isInd = State.data.subMode === 'individual';
         const isProject = State.data.mainMode === 'project';
-
-        let tariffHTML = '';
-
-        if (isInd) {
-            // Индивидуальный режим — оставлен как был
-            const displayUnit = meta.unitPrice.toString().replace('.', ',');
-            const unitInputHtml = `<input type="text" class="tariff-field-input" value="${displayUnit}" data-action="custom-price" data-type="unit">`;
-            const customDocsVal = State.data.customDocsCount !== null ? State.data.customDocsCount : meta.limitVal;
-            const docsInputHtml = `<input type="number" class="tariff-field-input" min="1" value="${customDocsVal}" data-action="custom-price" data-type="docs-count">`;
-
-            tariffHTML = `
-                <div class="detail-row">
-                    <span>Пакет (документов)</span>
-                    <div class="price-edit-block">${docsInputHtml}<span class="unit-text">шт.</span></div>
-                </div>
-                <div class="detail-row">
-                    <span>Стоимость пакета</span>
-                    <div class="price-edit-block"><strong>${Helpers.fmt(meta.basePrice)}</strong><span class="unit-text">₽</span></div>
-                </div>
-                <div class="detail-row highlight">
-                    <span>Цена за 1 документ</span>
-                    <div class="price-edit-block">${unitInputHtml}<span class="unit-text">₽</span></div>
-                </div>`;
-        } else {
-            // Стандартный режим — показываем подобранные пакеты
-            let packagesRows = meta.packages.map(p => `
-                <div class="detail-row">
-                    <span>${p.qty > 1 ? p.qty + ' × ' : ''}${p.name}</span>
-                    <div class="price-edit-block"><strong>${Helpers.fmt(p.price)}</strong><span class="unit-text">₽</span></div>
-                </div>
-            `).join('');
-
-            let pricePerDocRow = '';
-            if (meta.pricePerDoc > 0) {
-                pricePerDocRow = `
-                    <div class="detail-row highlight">
-                        <span>Стоимость за 1 документ</span>
-                        <div class="price-edit-block"><strong>${Helpers.fmt(meta.pricePerDoc)}</strong><span class="unit-text">₽</span></div>
-                    </div>`;
-            }
-
-            tariffHTML = packagesRows + `
-                <div class="detail-row highlight">
-                    <span>Всего документов</span>
-                    <div class="price-edit-block"><strong>${Helpers.fmt(meta.totalDocs)}</strong><span class="unit-text">шт.</span></div>
-                </div>
-                <div class="detail-row highlight">
-                    <span>Стоимость тарифа</span>
-                    <div class="price-edit-block"><strong>${Helpers.fmt(meta.basePrice)}</strong><span class="unit-text">₽</span></div>
-                </div>
-                ${pricePerDocRow}`;
-        }
-
 
         let tariffHTML = '';
 
@@ -750,14 +539,9 @@ const UI = {
                 : State.getPrice(CONSTANTS.KEYS.project);
             const pInput = isInd
                 ? `<input type="text" class="tariff-field-input" value="${pPrice.toString().replace('.', ',')}" data-action="custom-price" data-type="project">`
-                ? `<input type="text" class="tariff-field-input" value="${pPrice.toString().replace('.', ',')}" data-action="custom-price" data-type="project">`
                 : `<strong>${Helpers.fmt(pPrice)}</strong>`;
 
             projectHtml = `
-                <div class="detail-row project-row">
-                    <span>Проектное решение</span>
-                    <div class="price-edit-block">${pInput}<span class="unit-text">₽</span></div>
-                </div>`;
                 <div class="detail-row project-row">
                     <span>Проектное решение</span>
                     <div class="price-edit-block">${pInput}<span class="unit-text">₽</span></div>
@@ -770,24 +554,13 @@ const UI = {
                 ? 'Оптимальная комбинация' 
                 : 'Стандартный тариф');
 
-        const titleText = isInd ? meta.displayKey : meta.displayKey;
-
-        const labelText = isInd 
-            ? 'Индивидуальные условия' 
-            : (meta.packages.length > 1 || (meta.packages.length === 1 && meta.packages[0].qty > 1) 
-                ? 'Оптимальная комбинация' 
-                : 'Стандартный тариф');
-
         container.innerHTML = `
             <div class="tariff-card animated-fade ${isInd ? 'individual-mode' : ''}">
                 <div class="tariff-header">
                     <span class="tariff-label">${labelText}</span>
-                    <h3 class="tariff-title">${titleText}</h3>
-                    <span class="tariff-label">${labelText}</span>
                     <h3 class="tariff-title">${meta.displayKey}</h3>
                 </div>
                 <div class="detailing-section">
-                    ${tariffHTML}
                     ${tariffHTML}
                     ${projectHtml}
                 </div>
@@ -966,13 +739,11 @@ const UI = {
         if (act === 'docs-month') {
             State.data.docsYearly = (parseInt(val)||0) * 12;
             State.data.customDocsCount = null;
-            State.data.customDocsCount = null;
             this.els['docs-year'].value = State.data.docsYearly;
             this.update();
         } 
         else if (act === 'docs-year') {
             State.data.docsYearly = parseInt(val)||0;
-            State.data.customDocsCount = null;
             State.data.customDocsCount = null;
             this.els['docs-month'].value = Math.round(State.data.docsYearly / 12);
             this.update();
@@ -982,7 +753,6 @@ const UI = {
             this.update();
         }
         else if (act === 'kcr-qty') {
-            const field = t.dataset.field;
             const field = t.dataset.field;
             State.data.kcrDetails[field] = Math.max(0, parseInt(val)||0);
             this.update();
@@ -1014,18 +784,8 @@ const UI = {
                 State.data.customPrices[type] = floatVal;
                 this.update();
             }
-            if (type === 'docs-count') {
-                const num = parseInt(t.value) || null;
-                State.data.customDocsCount = num && num > 0 ? num : null;
-                this.update();
-            } else {
-                const floatVal = parseFloat(t.value.replace(',', '.')) || 0;
-                State.data.customPrices[type] = floatVal;
-                this.update();
-            }
         }
         else if (act === 'toggle-sig') {
-            const type = t.dataset.val;
             const type = t.dataset.val;
             const checked = t.checked;
             
@@ -1084,10 +844,6 @@ const UI = {
             t.classList.add('selected');
             
             State.data.subMode = t.dataset.val;
-            if (State.data.subMode === 'standard') {
-                State.data.customPrices = {};
-                State.data.customDocsCount = null;
-            }
             if (State.data.subMode === 'standard') {
                 State.data.customPrices = {};
                 State.data.customDocsCount = null;
@@ -1246,12 +1002,9 @@ window.downloadKP = async () => {
                 return `<tr>
                     <td style="padding:6px 8px 6px 0;font-size:9.5pt;color:#1a1a2e;border-bottom:1px solid #ede8ff;word-break:break-word;max-width:360px;line-height:1.4;">${title}</td>
                     <td style="padding:6px 0 6px 8px;text-align:right;font-weight:700;color:#7c3aed;font-size:9.5pt;white-space:nowrap;border-bottom:1px solid #ede8ff;vertical-align:top;">${price}</td>
-                    <td style="padding:6px 8px 6px 0;font-size:9.5pt;color:#1a1a2e;border-bottom:1px solid #ede8ff;word-break:break-word;max-width:360px;line-height:1.4;">${title}</td>
-                    <td style="padding:6px 0 6px 8px;text-align:right;font-weight:700;color:#7c3aed;font-size:9.5pt;white-space:nowrap;border-bottom:1px solid #ede8ff;vertical-align:top;">${price}</td>
                 </tr>`;
             }
             return `<tr>
-                <td colspan="2" style="padding:6px 0;font-size:9.5pt;color:#1a1a2e;border-bottom:1px solid #ede8ff;word-break:break-word;line-height:1.4;">${title}</td>
                 <td colspan="2" style="padding:6px 0;font-size:9.5pt;color:#1a1a2e;border-bottom:1px solid #ede8ff;word-break:break-word;line-height:1.4;">${title}</td>
             </tr>`;
         }).join('');
@@ -1260,11 +1013,8 @@ window.downloadKP = async () => {
     const summaryBlock = `
         <div style="background:#f3f0ff;border-radius:10px;padding:16px 28px;margin-top:14px;text-align:center;">
             <div style="font-size:9.5pt;color:#6d28d9;margin-bottom:6px;">
-        <div style="background:#f3f0ff;border-radius:10px;padding:16px 28px;margin-top:14px;text-align:center;">
-            <div style="font-size:9.5pt;color:#6d28d9;margin-bottom:6px;">
                 Стоимость для ${clientName}:
             </div>
-            <div style="font-size:20pt;font-weight:800;color:#7c3aed;letter-spacing:-0.5px;">
             <div style="font-size:20pt;font-weight:800;color:#7c3aed;letter-spacing:-0.5px;">
                 ${Helpers.fmt(result.total)} ₽
             </div>
@@ -1276,16 +1026,12 @@ window.downloadKP = async () => {
 
     const contactBlock = `
         <div style="border:1px solid #ede8ff;border-radius:10px;padding:14px 20px;margin-top:12px;display:flex;justify-content:space-between;align-items:center;">
-        <div style="border:1px solid #ede8ff;border-radius:10px;padding:14px 20px;margin-top:12px;display:flex;justify-content:space-between;align-items:center;">
             <div>
-                <div style="font-size:11pt;font-weight:700;margin-bottom:4px;">
                 <div style="font-size:11pt;font-weight:700;margin-bottom:4px;">
                     <a href="${helpUrl}" style="color:#7c3aed;text-decoration:underline;" target="_blank">Как подключиться</a>
                 </div>
                 <div style="font-size:8.5pt;color:#888;">Свяжитесь с нами, чтобы подключить сервис</div>
-                <div style="font-size:8.5pt;color:#888;">Свяжитесь с нами, чтобы подключить сервис</div>
             </div>
-            <div style="text-align:right;font-size:9pt;color:#1a1a2e;line-height:1.7;">
             <div style="text-align:right;font-size:9pt;color:#1a1a2e;line-height:1.7;">
                 ${partnerName  ? `<div style="font-weight:600;">${partnerName}</div>`  : ''}
                 ${partnerPhone ? `<div>${partnerPhone}</div>` : ''}
@@ -1296,13 +1042,6 @@ window.downloadKP = async () => {
     const page1HTML = `
         <div style="width:794px;background:#fff;box-sizing:border-box;">
             ${b64Header ? `<img src="${b64Header}" style="width:794px;display:block;">` : ''}
-            <div style="padding:18px 44px 30px;">
-                <div style="font-size:12pt;font-weight:800;color:#7c3aed;margin-bottom:10px;">Стоимость подключения:</div>
-                <table style="width:100%;border-collapse:collapse;table-layout:fixed;">
-                    <colgroup>
-                        <col style="width:70%">
-                        <col style="width:30%">
-                    </colgroup>
             <div style="padding:18px 44px 30px;">
                 <div style="font-size:12pt;font-weight:800;color:#7c3aed;margin-bottom:10px;">Стоимость подключения:</div>
                 <table style="width:100%;border-collapse:collapse;table-layout:fixed;">
@@ -1331,7 +1070,6 @@ window.downloadKP = async () => {
     const PDF_H = 841.89;
     
     let linkCoordinates = null;
-    let linkCoordinates = null;
 
     async function renderPageToCanvas(htmlContent, pageIndex) {
         const div = document.createElement('div');
@@ -1352,9 +1090,7 @@ window.downloadKP = async () => {
                 
                 const scaleX = PDF_W / 794;
                 const scaleY = PDF_W / 794;
-                const scaleY = PDF_W / 794;
                 
-                const pad = 4;
                 const pad = 4;
                 linkCoordinates = {
                     x: relativeX * scaleX - pad,
@@ -1413,8 +1149,6 @@ window.downloadKP = async () => {
             }
         }
 
-        // FIX 2: Название файла "КП Астрал.ЭПД для <Клиент>"
-        doc.save(`КП Астрал.ЭПД для ${clientName}.pdf`);
         doc.save(`КП Астрал.ЭПД для ${clientName}.pdf`);
 
     } catch (err) {
