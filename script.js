@@ -27,7 +27,9 @@ const CONSTANTS = {
             setup_mac_1: "OC MacOS nalog.ru или ЕСИА",
             setup_mac_2: "OC MacOS nalog.ru и ЕСИА",
             install_base: "Типовая Установка пр",
-            training: "Обучение пользователей по работе с Пр"
+            training: "Обучение пользователей по работе с Пр",
+            goslog_win: "Регистрация на платформе «ГосЛог»\nOC Windows",
+            goslog_mac: "Регистрация на платформе «ГосЛог»\nOC MacOS"
         }
     },
     LIMITS: [600, 1000, 5000, 10000, 50000, 100000],
@@ -39,6 +41,13 @@ const CONSTANTS = {
                 { id: 'sw2', label: 'Windows (nalog.ru <b>и</b> ЕСИА)', keyRef: 'setup_win_2' },
                 { id: 'sm1', label: 'MacOS (nalog.ru <b>или</b> ЕСИА)', keyRef: 'setup_mac_1' },
                 { id: 'sm2', label: 'MacOS (nalog.ru <b>и</b> ЕСИА)', keyRef: 'setup_mac_2' }
+            ]
+        },
+        {
+            id: 'goslog', title: 'Регистрация на платформе «ГосЛог»',
+            items: [
+                { id: 'gw1', label: 'Регистрация на платформе «ГосЛог» для OC Windows', keyRef: 'goslog_win' },
+                { id: 'gm1', label: 'Регистрация на платформе «ГосЛог» для OC MacOS', keyRef: 'goslog_mac' }
             ]
         },
         {
