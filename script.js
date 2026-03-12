@@ -29,7 +29,8 @@ const CONSTANTS = {
             install_base: "Типовая Установка пр",
             training: "Обучение пользователей по работе с Пр",
             goslog_win: "Регистрация на платформе «ГосЛог»\nOC Windows",
-            goslog_mac: "Регистрация на платформе «ГосЛог»\nOC MacOS"
+            goslog_mac: "Регистрация на платформе «ГосЛог»\nOC MacOS",
+            project_survey: "Проектное обследование"
         }
     },
     LIMITS: [600, 1000, 5000, 10000, 50000, 100000],
@@ -54,7 +55,8 @@ const CONSTANTS = {
             id: 'service', title: 'Внедрение и обучение',
             items: [
                 { id: 'i1', label: 'Типовая установка', keyRef: 'install_base' },
-                { id: 't1', label: 'Обучение (1 группа)', keyRef: 'training' }
+                { id: 't1', label: 'Обучение (1 группа)', keyRef: 'training' },
+                { id: 'ps1', label: 'Проектное обследование (1 час)', keyRef: 'project_survey' }
             ]
         }
     ],
@@ -613,7 +615,8 @@ const UI = {
         const container = document.getElementById('basis-pricing-container');
         if (!container) return;
 
-        if (!isInd) {
+        // Показываем только если индивидуальный режим И выбран тип подписи "basis"
+        if (!isInd || State.data.sigType !== 'basis') {
             container.innerHTML = '';
             return;
         }
@@ -648,7 +651,8 @@ const UI = {
         const container = document.getElementById('kcr-pricing-container');
         if (!container) return;
 
-        if (!isInd) {
+        // Показываем только если индивидуальный режим И выбран тип подписи "kcr"
+        if (!isInd || State.data.sigType !== 'kcr') {
             container.innerHTML = '';
             return;
         }
@@ -696,14 +700,6 @@ const UI = {
     },
 
     updateMCHDPricing(isInd) {
-        if (!isInd) {
-            ['base', 'ext', 'single', 'extra'].forEach(type => {
-                const container = document.getElementById(`mchd-${type}-pricing-container`);
-                if (container) container.innerHTML = '';
-            });
-            return;
-        }
-
         const mchdTypes = [
             { id: 'base', key: CONSTANTS.KEYS.mchd.base, name: 'Базовый' },
             { id: 'ext', key: CONSTANTS.KEYS.mchd.ext, name: 'Расширенный' },
@@ -714,6 +710,12 @@ const UI = {
         mchdTypes.forEach(type => {
             const container = document.getElementById(`mchd-${type.id}-pricing-container`);
             if (!container) return;
+
+            // Показываем только если индивидуальный режим И карточка активирована
+            if (!isInd || !State.data.mchd[type.id].active) {
+                container.innerHTML = '';
+                return;
+            }
 
             const customPrice = State.data.customPrices[type.key] || '';
 
