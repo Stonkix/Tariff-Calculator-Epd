@@ -115,7 +115,6 @@ const Helpers = {
     },
     fmt: (num) => Math.round(num).toLocaleString('ru-RU'),
     fmtDecimal: (num) => {
-        // Форматирует число с двумя знаками после запятой если есть дробная часть
         if (num % 1 === 0) return Math.round(num).toLocaleString('ru-RU');
         return num.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0');
     }
@@ -209,7 +208,6 @@ const Calculator = {
 
         const tariffRes = this.calcTariff();
         total += tariffRes.cost;
-        // Для стандартного режима добавляем все строки пакетов
         if (tariffRes.lines && tariffRes.lines.length) {
             lines.push(...tariffRes.lines);
         } else if (tariffRes.line) {
@@ -269,20 +267,21 @@ const Calculator = {
                 meta: { key, limitVal, basePrice: cost, unitPrice: currentUnit, effectiveDocs, displayKey } 
             };
         } else {
-            // Стандартный режим — оптимальная комбинация
             const opt = this.getOptimalTariff(State.data.docsYearly);
             const cost = opt.cost;
 
-            // Цена за документ с точностью до xx.xx
             let pricePerDoc = 0;
             if (opt.totalDocs > 0) {
                 pricePerDoc = Math.round((cost / opt.totalDocs) * 100) / 100;
             }
 
-            // Строки детализации — каждый пакет отдельно
-            const lines = opt.packages.map(pkg =>
-                `Тариф: ${pkg.name} × ${pkg.qty} = ${Helpers.fmt(pkg.price)} ₽`
-            );
+            const lines = opt.packages.map(pkg => {
+                if (pkg.qty > 1) {
+                    return `Тариф: ${pkg.name} ${Helpers.fmt(pkg.unitPrice)} ₽ × ${pkg.qty} = ${Helpers.fmt(pkg.price)} ₽`;
+                } else {
+                    return `Тариф: ${pkg.name} × ${pkg.qty} = ${Helpers.fmt(pkg.price)} ₽`;
+                }
+            });
 
             return { 
                 cost, 
@@ -313,7 +312,12 @@ const Calculator = {
                     : State.getPrice(key);
                 const sum = d.ukepQty * price;
                 cost += sum;
-                lines.push(`УКЭП Базис (${d.ukepPeriod} мес.) x ${d.ukepQty}: ${Helpers.fmt(sum)} ₽`);
+                
+                if (d.ukepQty > 1) {
+                    lines.push(`УКЭП Базис (${d.ukepPeriod} мес.) ${Helpers.fmt(price)} ₽ x ${d.ukepQty}: ${Helpers.fmt(sum)} ₽`);
+                } else {
+                    lines.push(`УКЭП Базис (${d.ukepPeriod} мес.) x ${d.ukepQty}: ${Helpers.fmt(sum)} ₽`);
+                }
             } else if (d.sigType === 'kcr') {
                 const customKcrPrice = State.data.customPrices[CONSTANTS.KEYS.kcr];
                 const kcrBase = (State.data.subMode === 'individual' && customKcrPrice !== undefined)
@@ -336,7 +340,12 @@ const Calculator = {
                             : State.getPrice(item.key);
                         const sum = item.qty * price;
                         cost += sum;
-                        lines.push(`${item.name} x ${item.qty}: ${Helpers.fmt(sum)} ₽`);
+                        
+                        if (item.qty > 1) {
+                            lines.push(`${item.name} ${Helpers.fmt(price)} ₽ x ${item.qty}: ${Helpers.fmt(sum)} ₽`);
+                        } else {
+                            lines.push(`${item.name} x ${item.qty}: ${Helpers.fmt(sum)} ₽`);
+                        }
                     }
                 });
             }
@@ -362,8 +371,12 @@ const Calculator = {
                 const name = (type === 'base') ? 'МЧД Базовый' : 
                              (type === 'ext') ? 'МЧД Расширенный' :
                              (type === 'single') ? 'Одна МЧД' : 'Доп. МЧД';
-                             
-                lines.push(`${name} x ${item.qty}: ${Helpers.fmt(sum)} ₽`);
+                
+                if (item.qty > 1) {
+                    lines.push(`${name} ${Helpers.fmt(price)} ₽ x ${item.qty}: ${Helpers.fmt(sum)} ₽`);
+                } else {
+                    lines.push(`${name} x ${item.qty}: ${Helpers.fmt(sum)} ₽`);
+                }
             }
         });
         return { cost, lines };
@@ -389,7 +402,12 @@ const Calculator = {
                         const sum = price * qty;
                         cost += sum;
                         const labelText = item.label.replace(/<[^>]*>/g, '');
-                        lines.push(`${labelText} x ${qty}: ${Helpers.fmt(sum)} ₽`);
+                        
+                        if (qty > 1) {
+                            lines.push(`${labelText} ${Helpers.fmt(price)} ₽ x ${qty}: ${Helpers.fmt(sum)} ₽`);
+                        } else {
+                            lines.push(`${labelText} x ${qty}: ${Helpers.fmt(sum)} ₽`);
+                        }
                     }
                 });
             }
@@ -513,7 +531,6 @@ const UI = {
                     <div class="price-edit-block">${unitInputHtml}<span class="unit-text">₽</span></div>
                 </div>`;
         } else {
-            // Стандартный режим — показываем каждый пакет отдельно
             let packagesRows = meta.packages.map(p => `
                 <div class="detail-row">
                     <span>${p.qty > 1 ? p.qty + ' × ' : ''}${p.name}</span>
@@ -521,7 +538,6 @@ const UI = {
                 </div>
             `).join('');
 
-            // Цена за документ с xx.xx форматом
             let pricePerDocRow = '';
             if (meta.pricePerDoc > 0) {
                 pricePerDocRow = `
@@ -615,7 +631,6 @@ const UI = {
         const container = document.getElementById('basis-pricing-container');
         if (!container) return;
 
-        // Показываем только если индивидуальный режим И выбран тип подписи "basis"
         if (!isInd || State.data.sigType !== 'basis') {
             container.innerHTML = '';
             return;
@@ -651,7 +666,6 @@ const UI = {
         const container = document.getElementById('kcr-pricing-container');
         if (!container) return;
 
-        // Показываем только если индивидуальный режим И выбран тип подписи "kcr"
         if (!isInd || State.data.sigType !== 'kcr') {
             container.innerHTML = '';
             return;
@@ -711,7 +725,6 @@ const UI = {
             const container = document.getElementById(`mchd-${type.id}-pricing-container`);
             if (!container) return;
 
-            // Показываем только если индивидуальный режим И карточка активирована
             if (!isInd || !State.data.mchd[type.id].active) {
                 container.innerHTML = '';
                 return;
@@ -740,6 +753,29 @@ const UI = {
         document.body.addEventListener('input', (e) => this.handleInput(e));
         document.body.addEventListener('change', (e) => this.handleChange(e));
         document.body.addEventListener('click', (e) => this.handleClick(e));
+        
+        // ФИX: Убираем принудительное обнуление в blur.
+        // Поля с placeholder="0" визуально показывают 0 когда пусты,
+        // но value остаётся '' — это корректное поведение для всех полей qty.
+        // Принудительное value='0' при blur ломало UX: курсор уходил в конец цифры 0.
+
+        document.body.addEventListener('focus', (e) => {
+            const t = e.target;
+            // Только для qty-полей (не tariff-field-input и не custom-price-input)
+            if (t.type === 'number' && t.classList.contains('qty-input')) {
+                // Если значение равно '0' — очищаем для удобного ввода
+                if (t.value === '0') {
+                    t.value = '';
+                }
+            }
+        }, true);
+        
+        document.body.addEventListener('blur', (e) => {
+            const t = e.target;
+            // Только для qty-полей — при потере фокуса с пустым значением 
+            // НЕ ставим '0', просто оставляем пустым (placeholder='0' покажет 0 визуально)
+            // Это обеспечивает одинаковое поведение с полями сервисных услуг
+        }, true);
     },
 
     handleInput(e) {
@@ -760,17 +796,20 @@ const UI = {
             this.update();
         }
         else if (act === 'ukep-qty') {
-            State.data.ukepQty = Math.max(0, parseInt(val)||0);
+            const numVal = parseInt(val) || 0;
+            State.data.ukepQty = Math.max(0, numVal);
             this.update();
         }
         else if (act === 'kcr-qty') {
             const field = t.dataset.field;
-            State.data.kcrDetails[field] = Math.max(0, parseInt(val)||0);
+            const numVal = parseInt(val) || 0;
+            State.data.kcrDetails[field] = Math.max(0, numVal);
             this.update();
         }
         else if (act === 'mchd-qty') {
             const type = t.dataset.type;
-            State.data.mchd[type].qty = Math.max(0, parseInt(val)||0);
+            const numVal = parseInt(val) || 0;
+            State.data.mchd[type].qty = Math.max(0, numVal);
             this.update();
         }
         else if (act === 'update-addon') {
@@ -821,8 +860,8 @@ const UI = {
             
             document.getElementById(`card-mchd-${type}`).classList.toggle('active', checked);
             if (checked) {
-                // При активации устанавливаем значение 1 если было 0
-                if (State.data.mchd[type].qty === 0) {
+                // При активации устанавливаем значение 1 если было 0 или пусто
+                if (!State.data.mchd[type].qty) {
                     State.data.mchd[type].qty = 1;
                     document.getElementById(`input-mchd-${type}`).value = 1;
                 }
@@ -887,7 +926,12 @@ const UI = {
 document.addEventListener('DOMContentLoaded', async () => {
     State.initAddons();
     UI.init();
-    
+
+    // ФИX: Не инициализируем поля значением '0' принудительно.
+    // Поля имеют placeholder="0" в HTML — этого достаточно для визуального отображения.
+    // Принудительная установка value='0' приводила к тому, что при клике
+    // курсор вставал в конец числа '0' вместо очистки поля.
+
     const contactFields = ['partner-name', 'partner-phone', 'partner-email', 'client-name'];
     contactFields.forEach(fieldId => {
         const saved = localStorage.getItem(`epd-${fieldId}`);
@@ -956,8 +1000,6 @@ window.downloadKP = async () => {
         .map(l => l.replace(/<[^>]*>?/gm, '').trim())
         .filter(Boolean);
 
-    // Парсинг строк тарифных пакетов: "Тариф: 1С-ЭПД 600 документов × 2 = 7 200 ₽"
-    // Использует tariffPackages из результата расчёта для получения unitPrice из JSON
     function parseTariffPackageLine(line, packages) {
         const m = line.match(/^Тариф:\s*(.+?)\s*=\s*([\d\s]+)\s*₽\s*$/);
         if (m) {
@@ -967,16 +1009,15 @@ window.downloadKP = async () => {
             if (crossIdx !== -1) {
                 const pkgName = nameAndQty.slice(0, crossIdx).trim();
                 const qty = nameAndQty.slice(crossIdx + 1).trim();
-                // Ищем unitPrice из packages (из JSON)
                 let unitPriceFmt = '';
                 if (packages) {
                     const found = packages.find(p => p.name === pkgName);
                     if (found && found.unitPrice) {
-                        unitPriceFmt = Helpers.fmt(found.unitPrice) + ' ₽';
+                        unitPriceFmt = Helpers.fmt(found.unitPrice);
                     }
                 }
                 return {
-                    title: `${pkgName}${unitPriceFmt ? ' (' + unitPriceFmt + ')' : ''} × ${qty}`,
+                    title: `${pkgName}${unitPriceFmt ? ' (' + unitPriceFmt + ' ₽)' : ''} × ${qty}`,
                     price: totalPriceStr
                 };
             }
@@ -988,7 +1029,6 @@ window.downloadKP = async () => {
     const PRICE_RE = /(\d[\d\s]*[\d])\s*[РрPp₽руб\.]+\s*$/i;
 
     function parseLine(line) {
-        // Сначала проверяем формат тарифного пакета
         const tariffParsed = parseTariffPackageLine(line, result.tariffPackages);
         if (tariffParsed) return tariffParsed;
 

@@ -55,7 +55,8 @@
             <div class="addon-card" style="border: 2px solid var(--bg-light);">
                 <div style="margin-bottom: 20px;">
                     <label style="font-weight: 600; color: var(--primary);">Общее кол-во сотрудников:</label>
-                    <input type="number" id="ukep-qty" class="qty-input" style="width: 100px; margin-left: 10px;" min="0" value="0" data-action="ukep-qty">
+                    <!-- ФИX: placeholder="0" вместо value="0" — поле ведёт себя как поля сервисных услуг -->
+                    <input type="number" id="ukep-qty" class="qty-input" style="width: 100px; margin-left: 10px;" min="0" placeholder="0" data-action="ukep-qty">
                 </div>
 
                 <div class="sig-grid">
@@ -106,7 +107,8 @@
                         </label>
                     </div>
                     <p class="mchd-desc">5 МЧД для одной организации.</p>
-                    <input type="number" class="qty-input mchd-input" id="input-mchd-base" min="0" data-action="mchd-qty" data-type="base">
+                    <!-- ФИX: placeholder="0" вместо value="0" -->
+                    <input type="number" class="qty-input mchd-input" id="input-mchd-base" min="0" placeholder="0" data-action="mchd-qty" data-type="base">
                     <div id="mchd-base-pricing-container"></div>
                 </div>
 
@@ -119,7 +121,7 @@
                         </label>
                     </div>
                     <p class="mchd-desc">5 МЧД для разных организаций</p>
-                    <input type="number" class="qty-input mchd-input" id="input-mchd-ext" min="0" data-action="mchd-qty" data-type="ext">
+                    <input type="number" class="qty-input mchd-input" id="input-mchd-ext" min="0" placeholder="0" data-action="mchd-qty" data-type="ext">
                     <div id="mchd-ext-pricing-container"></div>
                 </div>
 
@@ -132,7 +134,7 @@
                         </label>
                     </div>
                     <p class="mchd-desc">Выпуск специалистом</p>
-                    <input type="number" class="qty-input mchd-input" id="input-mchd-single" min="0" data-action="mchd-qty" data-type="single">
+                    <input type="number" class="qty-input mchd-input" id="input-mchd-single" min="0" placeholder="0" data-action="mchd-qty" data-type="single">
                     <div id="mchd-single-pricing-container"></div>
                 </div>
 
@@ -145,7 +147,7 @@
                         </label>
                     </div>
                     <p class="mchd-desc">Покупка в ЛК</p>
-                    <input type="number" class="qty-input mchd-input" id="input-mchd-extra" min="0" data-action="mchd-qty" data-type="extra">
+                    <input type="number" class="qty-input mchd-input" id="input-mchd-extra" min="0" placeholder="0" data-action="mchd-qty" data-type="extra">
                     <div id="mchd-extra-pricing-container"></div>
                 </div>
             </div>
@@ -212,7 +214,5 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="script.js"></script>
-</body>
-</html></script>
 </body>
 </html>
