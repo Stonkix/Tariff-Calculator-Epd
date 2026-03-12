@@ -9,8 +9,8 @@ const CONSTANTS = {
             "1С-ЭПД \n50 000 документов\n", "1С-ЭПД \n100 000 документов\n"
         ],
         project: "1С-ЭПД Проектное решение",
-        ukep12: "УКЭП Базис 12 месяцев", 
-        ukep15: "УКЭП Базис 15 месяцев",
+        ukep12: "УКЭП Базис  12 месяцев", 
+        ukep15: "УКЭП Базис  15 месяцев",
         kcr: "КЦР ", 
         kepEgais: "КЭП ЕГАИС",
         kepUniv: "КЭП Универсальный",
@@ -820,9 +820,19 @@ const UI = {
             State.data.mchd[type].active = checked;
             
             document.getElementById(`card-mchd-${type}`).classList.toggle('active', checked);
-            if (checked && State.data.mchd[type].qty === 0) {
-                State.data.mchd[type].qty = 1;
-                document.getElementById(`input-mchd-${type}`).value = 1;
+            if (checked) {
+                // При активации устанавливаем значение 1 если было 0
+                if (State.data.mchd[type].qty === 0) {
+                    State.data.mchd[type].qty = 1;
+                    document.getElementById(`input-mchd-${type}`).value = 1;
+                }
+            } else {
+                // При деактивации обнуляем количество и очищаем поле ввода
+                State.data.mchd[type].qty = 0;
+                const inputField = document.getElementById(`input-mchd-${type}`);
+                if (inputField) {
+                    inputField.value = '';
+                }
             }
             this.update();
         }
