@@ -1118,12 +1118,12 @@ window.downloadKP = async () => {
     // ── Данные клиентов ───────────────────────────────────────────────────
     const contactUrl  = 'https://astral.ru/contacts/';
     const clientsData = [
-        { text: 'ГУП «Мосгортранс»',                                       url: 'https://astral.ru/' },
-        { text: 'Транспортная группа «FESCO»',                              url: 'https://astral.ru/' },
-        { text: 'МКП «Калининград-Гортранс»',                               url: 'https://astral.ru/' },
-        { text: 'Почта России',                                             url: 'https://astral.ru/' },
-        { text: 'Разработчик программно-аппаратных комплексов «ЭСМО»',     url: 'https://astral.ru/' },
-        { text: '«Транспорт Ярославии»',                                    url: 'https://astral.ru/' },
+        { text: 'ГУП «Мосгортранс»',                                       url: 'https://1c-epd.ru/cases/pervyy-v-rossii-elektronnyy-putevoy-list-proveden-gup-mosgortrans-cherez-servis-1s-epd/' },
+        { text: 'Транспортная группа «FESCO»',                              url: 'https://1c-epd.ru/cases/kaluga-astral-i-fesco-aprobiruyut-peredachu-elektronnykh-perevozochnykh-dokumentov-v-gis-epd/' },
+        { text: 'МКП «Калининград-Гортранс»',                               url: 'https://1c-epd.ru/cases/pervyy-v-rossii-avtobus-putevoy-list-na-kotoryy-byl-podpisan-gosklyuchom-vyshel-v-reys-v-kaliningrad/' },
+        { text: 'Почта России',                                             url: 'https://1c-epd.ru/cases/pochta-rossii-perekhodit-na-elektronnye-putevye-listy/' },
+        { text: 'Разработчик программно-аппаратных комплексов «ЭСМО»',     url: 'https://1c-epd.ru/cases/esmo-i-kaluga-astral-integratsiya-dlya-elektronnykh-putevykh-listov/' },
+        { text: '«Транспорт Ярославии»',                                    url: 'https://1c-epd.ru/cases/ob-aktivnom-vnedrenii-gis-epd/' },
     ];
 
     const clientsBlockContent = `
