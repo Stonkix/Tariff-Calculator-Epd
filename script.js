@@ -990,11 +990,13 @@ window.downloadKP = async () => {
         } catch (e) { return ''; }
     }
 
-    const [b64Header, b64Middle, b64Low] = await Promise.all([
-        toBase64(`${prefix}-header.jpg`),
-        toBase64(`${prefix}-middle.jpg`),
-        toBase64(`${prefix}-low.jpg`),
-    ]);
+    const imageKeys = isTypical
+        ? ['header', 'middle', 'footer']
+        : ['header', 'middle', 'footer'];
+
+    const [b64Header, b64Middle, b64Footer] = await Promise.all(
+        imageKeys.map(k => toBase64(`${prefix}-${k}.jpg`))
+    );
 
     const lines = result.lines
         .map(l => l.replace(/<[^>]*>?/gm, '').trim())
@@ -1071,6 +1073,19 @@ window.downloadKP = async () => {
         }).join('');
     }
 
+    function buildSingleRow(line) {
+        const { title, price } = parseLine(line);
+        if (price) {
+            return `<tr>
+                <td style="padding:6px 8px 6px 0;font-size:9.5pt;color:#1a1a2e;border-bottom:1px solid #ede8ff;word-break:break-word;max-width:360px;line-height:1.4;">${title}</td>
+                <td style="padding:6px 0 6px 8px;text-align:right;font-weight:700;color:#7c3aed;font-size:9.5pt;white-space:nowrap;border-bottom:1px solid #ede8ff;vertical-align:top;">${price}</td>
+            </tr>`;
+        }
+        return `<tr>
+            <td colspan="2" style="padding:6px 0;font-size:9.5pt;color:#1a1a2e;border-bottom:1px solid #ede8ff;word-break:break-word;line-height:1.4;">${title}</td>
+        </tr>`;
+    }
+
     const summaryBlock = `
         <div style="background:#f3f0ff;border-radius:10px;padding:16px 28px;margin-top:14px;text-align:center;">
             <div style="font-size:9.5pt;color:#6d28d9;margin-bottom:6px;">
@@ -1081,7 +1096,7 @@ window.downloadKP = async () => {
             </div>
         </div>`;
 
-    const helpUrl = isTypical 
+    const helpUrl = isTypical
         ? 'https://astral.ru/help/1s-epd/1s-epd-tipovoe-reshenie/obshchaya-informatsiya/nachalo-raboty-s-1s-epd/'
         : 'https://astral.ru/help/1s-epd/1s-epd-proektnoe-reshenie/';
 
@@ -1089,7 +1104,7 @@ window.downloadKP = async () => {
         <div style="border:1px solid #ede8ff;border-radius:10px;padding:14px 20px;margin-top:12px;display:flex;justify-content:space-between;align-items:center;">
             <div>
                 <div style="font-size:11pt;font-weight:700;margin-bottom:4px;">
-                    <a href="${helpUrl}" style="color:#7c3aed;text-decoration:underline;" target="_blank">Как подключиться</a>
+                    <a href="https://astral.ru/contacts/" style="color:#7c3aed;text-decoration:underline;" target="_blank">Как подключиться</a>
                 </div>
                 <div style="font-size:8.5pt;color:#888;">Свяжитесь с нами, чтобы подключить сервис</div>
             </div>
@@ -1100,37 +1115,187 @@ window.downloadKP = async () => {
             </div>
         </div>`;
 
+    // ── Данные клиентов ───────────────────────────────────────────────────
+    const contactUrl  = 'https://astral.ru/contacts/';
+    const clientsData = [
+        { text: 'ГУП «Мосгортранс»',                                       url: 'https://astral.ru/' },
+        { text: 'Транспортная группа «FESCO»',                              url: 'https://astral.ru/' },
+        { text: 'МКП «Калининград-Гортранс»',                               url: 'https://astral.ru/' },
+        { text: 'Почта России',                                             url: 'https://astral.ru/' },
+        { text: 'Разработчик программно-аппаратных комплексов «ЭСМО»',     url: 'https://astral.ru/' },
+        { text: '«Транспорт Ярославии»',                                    url: 'https://astral.ru/' },
+    ];
+
+    const clientsBlockContent = `
+        <div style="padding:24px 44px 30px;">
+            <div style="font-size:16pt;font-weight:800;color:#7c3aed;margin-bottom:12px;">С нами работают:</div>
+            <ul style="margin:0 0 24px 18px;padding:0;list-style:disc;font-size:18pt;line-height:1.4;">
+                ${clientsData.slice(0, -1).map(c => `
+                    <li style="margin-bottom:0;">
+                        <span style="font-size:12pt;vertical-align:middle;">
+                            <a href="${c.url}" style="color:#7c3aed;text-decoration:underline;">${c.text}</a>
+                        </span>
+                    </li>`).join('')}
+                <li style="margin-bottom:0;">
+                    <span style="font-size:12pt;vertical-align:middle;">
+                        <a href="${clientsData[clientsData.length-1].url}" style="color:#7c3aed;text-decoration:underline;">${clientsData[clientsData.length-1].text}</a>
+                        <span style="color:#1a1a2e;"> и другие.</span>
+                    </span>
+                </li>
+            </ul>
+            <div style="font-size:16pt;font-weight:800;color:#7c3aed;margin-bottom:8px;">Как подключиться?</div>
+            <div style="font-size:14pt;color:#1a1a2e;padding-left:4px;">
+                <a href="${contactUrl}" style="color:#7c3aed;text-decoration:underline;">Свяжитесь с нами</a>,
+                чтобы подключить сервис
+            </div>
+        </div>`;
+
+    // ── Вспомогательные HTML-блоки для замеров ───────────────────────────
+    const summaryContactHTML = `
+        <div style="padding:0 44px 30px;">
+            ${summaryBlock}
+            ${contactBlock}
+        </div>`;
+
+    const contactOnlyHTML = `
+        <div style="padding:0 44px 30px;">
+            ${contactBlock}
+        </div>`;
+
+    const summaryOnlyHTML = `
+        <div style="padding:0 44px 8px;">
+            ${summaryBlock}
+        </div>`;
+
+    const tableHeaderHTML = `
+        <div style="padding:18px 44px 0;">
+            <div style="font-size:12pt;font-weight:800;color:#7c3aed;margin-bottom:10px;">Стоимость подключения:</div>
+            <table style="width:100%;border-collapse:collapse;table-layout:fixed;">
+                <colgroup><col style="width:70%"><col style="width:30%"></colgroup>
+                <tbody>`;
+    const tableFooterHTML = `</tbody></table></div>`;
+
+    // ── Замер высоты блока ───────────────────────────────────────────────
+    async function measureHeight(htmlContent) {
+        const div = document.createElement('div');
+        div.style.cssText = 'position:absolute;top:-9999px;left:0;width:794px;background:#fff;visibility:hidden;';
+        div.innerHTML = htmlContent;
+        document.body.appendChild(div);
+        await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+        const h = div.scrollHeight;
+        document.body.removeChild(div);
+        return h;
+    }
+
+    // ── Измеряем реальную высоту header-картинки ─────────────────────────
+    async function measureImgHeight(b64) {
+        if (!b64) return 0;
+        return new Promise(resolve => {
+            const img = new Image();
+            img.onload = () => resolve(Math.round(img.naturalHeight * (794 / img.naturalWidth)));
+            img.onerror = () => resolve(0);
+            img.src = b64;
+        });
+    }
+
+    const HEADER_H_PX = await measureImgHeight(b64Header);
+    const PAGE_H_PX   = 1122;
+    const CONTENT_MAX = PAGE_H_PX - HEADER_H_PX;
+
+    const summaryContactH = await measureHeight(summaryContactHTML);
+    const summaryOnlyH    = await measureHeight(summaryOnlyHTML);
+    const contactOnlyH    = await measureHeight(contactOnlyHTML);
+    const tableHeaderH    = await measureHeight(tableHeaderHTML + tableFooterHTML);
+
+    async function splitLines(lines, reserveBottom) {
+        const available = CONTENT_MAX - tableHeaderH - reserveBottom;
+        let accumulated = 0;
+        let splitIdx = lines.length;
+
+        for (let i = 0; i < lines.length; i++) {
+            const rowH = await measureHeight(tableHeaderHTML + buildSingleRow(lines[i]) + tableFooterHTML) - tableHeaderH;
+            accumulated += rowH;
+            if (accumulated > available) {
+                splitIdx = i;
+                break;
+            }
+        }
+        return splitIdx;
+    }
+
+    let overflowMode = 'none';
+    let splitIdx = lines.length;
+
+    splitIdx = await splitLines(lines, summaryContactH);
+    if (splitIdx < lines.length) {
+        splitIdx = await splitLines(lines, summaryOnlyH);
+        if (splitIdx === lines.length) {
+            overflowMode = 'contacts';
+        } else {
+            splitIdx = await splitLines(lines, 0);
+            if (splitIdx === lines.length) {
+                overflowMode = 'summary+contacts';
+            } else {
+                overflowMode = 'rows';
+            }
+        }
+    }
+
+    const linesPage1 = overflowMode === 'rows' ? lines.slice(0, splitIdx) : lines;
+    const linesPage2 = overflowMode === 'rows' ? lines.slice(splitIdx)    : [];
+
+    // Что идёт внизу стр.1
+    const page1Bottom =
+        overflowMode === 'none'             ? summaryContactHTML :
+        overflowMode === 'contacts'         ? summaryOnlyHTML    :
+        '';
+
+    // Что идёт вверху стр.2 (перед middle)
+    const page2Top =
+        overflowMode === 'contacts'         ? contactOnlyHTML :
+        overflowMode === 'summary+contacts' ? summaryContactHTML :
+        overflowMode === 'rows'             ? `
+            <div style="padding:0 44px 0;">
+                <table style="width:100%;border-collapse:collapse;table-layout:fixed;">
+                    <colgroup><col style="width:70%"><col style="width:30%"></colgroup>
+                    <tbody>${buildRows(linesPage2)}</tbody>
+                </table>
+            </div>
+            ${summaryContactHTML}` :
+        '';
+
+    // ── СТРАНИЦЫ ──────────────────────────────────────────────────────────
     const page1HTML = `
         <div style="width:794px;background:#fff;box-sizing:border-box;">
             ${b64Header ? `<img src="${b64Header}" style="width:794px;display:block;">` : ''}
-            <div style="padding:18px 44px 30px;">
+            <div style="padding:18px 44px 0;">
                 <div style="font-size:12pt;font-weight:800;color:#7c3aed;margin-bottom:10px;">Стоимость подключения:</div>
                 <table style="width:100%;border-collapse:collapse;table-layout:fixed;">
-                    <colgroup>
-                        <col style="width:70%">
-                        <col style="width:30%">
-                    </colgroup>
-                    <tbody>${buildRows(lines)}</tbody>
+                    <colgroup><col style="width:70%"><col style="width:30%"></colgroup>
+                    <tbody>${buildRows(linesPage1)}</tbody>
                 </table>
-                ${summaryBlock}
-                ${contactBlock}
             </div>
+            ${page1Bottom}
         </div>`;
 
     const page2HTML = `
         <div style="width:794px;background:#fff;box-sizing:border-box;">
+            ${page2Top}
             ${b64Middle ? `<img src="${b64Middle}" style="width:794px;display:block;">` : ''}
+            ${isTypical ? clientsBlockContent : ''}
         </div>`;
 
     const page3HTML = `
         <div style="width:794px;background:#fff;box-sizing:border-box;">
-            ${b64Low ? `<img src="${b64Low}" style="width:794px;display:block;">` : ''}
+            ${b64Footer ? `<img src="${b64Footer}" style="width:794px;display:block;">` : ''}
         </div>`;
 
+    // ── PDF ───────────────────────────────────────────────────────────────
     const PDF_W = 595.28;
     const PDF_H = 841.89;
-    
-    let linkCoordinates = null;
+
+    let page1LinkCoords = [];
+    let page2LinkCoords = [];
 
     async function renderPageToCanvas(htmlContent, pageIndex) {
         const div = document.createElement('div');
@@ -1140,26 +1305,36 @@ window.downloadKP = async () => {
 
         await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
+        const scaleX = PDF_W / 794;
+        const scaleY = PDF_W / 794;
+        const pad    = 4;
+
         if (pageIndex === 0) {
-            const linkElement = div.querySelector('a[href*="astral.ru"]');
-            if (linkElement) {
-                const rect = linkElement.getBoundingClientRect();
+            div.querySelectorAll('a[href]').forEach(el => {
+                const rect    = el.getBoundingClientRect();
                 const divRect = div.getBoundingClientRect();
-                
-                const relativeX = rect.left - divRect.left;
-                const relativeY = rect.top - divRect.top;
-                
-                const scaleX = PDF_W / 794;
-                const scaleY = PDF_W / 794;
-                
-                const pad = 4;
-                linkCoordinates = {
-                    x: relativeX * scaleX - pad,
-                    y: relativeY * scaleY - pad,
-                    width: rect.width * scaleX + pad * 2,
-                    height: rect.height * scaleY + pad * 2
-                };
-            }
+                page1LinkCoords.push({
+                    x:      (rect.left - divRect.left) * scaleX - pad,
+                    y:      (rect.top  - divRect.top)  * scaleY - pad,
+                    width:  rect.width  * scaleX + pad * 2,
+                    height: rect.height * scaleY + pad * 2,
+                    url:    el.href
+                });
+            });
+        }
+
+        if (pageIndex === 1) {
+            div.querySelectorAll('a[href]').forEach(el => {
+                const rect    = el.getBoundingClientRect();
+                const divRect = div.getBoundingClientRect();
+                page2LinkCoords.push({
+                    x:      (rect.left - divRect.left) * scaleX - pad,
+                    y:      (rect.top  - divRect.top)  * scaleY - pad,
+                    width:  rect.width  * scaleX + pad * 2,
+                    height: rect.height * scaleY + pad * 2,
+                    url:    el.href
+                });
+            });
         }
 
         const canvas = await html2canvas(div, {
@@ -1198,16 +1373,9 @@ window.downloadKP = async () => {
 
             if (i > 0) doc.addPage();
             doc.addImage(imgData, 'JPEG', 0, 0, PDF_W, Math.min(imgH, PDF_H));
-            
-            if (i === 0 && linkCoordinates) {
-                doc.link(
-                    linkCoordinates.x, 
-                    linkCoordinates.y, 
-                    linkCoordinates.width, 
-                    linkCoordinates.height, 
-                    { url: helpUrl }
-                );
-            }
+
+            if (i === 0) page1LinkCoords.forEach(c => doc.link(c.x, c.y, c.width, c.height, { url: c.url }));
+            if (i === 1) page2LinkCoords.forEach(c => doc.link(c.x, c.y, c.width, c.height, { url: c.url }));
         }
 
         doc.save(`КП Астрал.ЭПД для ${clientName}.pdf`);
