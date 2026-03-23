@@ -960,7 +960,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
-// Глобальные функции
 window.downloadKP = async () => {
     const result = Calculator.calculateAll();
     if (result.total === 0) {
@@ -990,13 +989,11 @@ window.downloadKP = async () => {
         } catch (e) { return ''; }
     }
 
-    const imageKeys = isTypical
-        ? ['header', 'middle', 'footer']
-        : ['header', 'middle', 'footer'];
-
-    const [b64Header, b64Middle, b64Footer] = await Promise.all(
-        imageKeys.map(k => toBase64(`${prefix}-${k}.jpg`))
-    );
+    const [b64Header, b64Middle, b64Footer] = await Promise.all([
+        toBase64(`${prefix}-header.jpg`),
+        toBase64(`${prefix}-middle.jpg`),
+        toBase64(`${prefix}-footer.jpg`),
+    ]);
 
     const lines = result.lines
         .map(l => l.replace(/<[^>]*>?/gm, '').trim())
@@ -1014,9 +1011,7 @@ window.downloadKP = async () => {
                 let unitPriceFmt = '';
                 if (packages) {
                     const found = packages.find(p => p.name === pkgName);
-                    if (found && found.unitPrice) {
-                        unitPriceFmt = Helpers.fmt(found.unitPrice);
-                    }
+                    if (found && found.unitPrice) unitPriceFmt = Helpers.fmt(found.unitPrice);
                 }
                 return {
                     title: `${pkgName}${unitPriceFmt ? ' (' + unitPriceFmt + ' ₽)' : ''} × ${qty}`,
@@ -1036,25 +1031,15 @@ window.downloadKP = async () => {
 
         if (line.includes('|')) {
             const parts = line.split('|');
-            return {
-                title: parts.slice(0, -1).join('|').trim(),
-                price: parts[parts.length - 1].trim()
-            };
+            return { title: parts.slice(0, -1).join('|').trim(), price: parts[parts.length - 1].trim() };
         }
         const colonIdx = line.lastIndexOf(':');
         if (colonIdx !== -1) {
             const after = line.slice(colonIdx + 1).trim();
-            if (PRICE_RE.test(after)) {
-                return {
-                    title: line.slice(0, colonIdx).trim(),
-                    price: after
-                };
-            }
+            if (PRICE_RE.test(after)) return { title: line.slice(0, colonIdx).trim(), price: after };
         }
         const m = line.match(/^(.+?)\s{2,}(\d[\d\s]*[\d]\s*[РрPp₽руб\.]+)\s*$/i);
-        if (m) {
-            return { title: m[1].trim(), price: m[2].trim() };
-        }
+        if (m) return { title: m[1].trim(), price: m[2].trim() };
         return { title: line, price: null };
     }
 
@@ -1088,17 +1073,9 @@ window.downloadKP = async () => {
 
     const summaryBlock = `
         <div style="background:#f3f0ff;border-radius:10px;padding:16px 28px;margin-top:14px;text-align:center;">
-            <div style="font-size:9.5pt;color:#6d28d9;margin-bottom:6px;">
-                Стоимость для ${clientName}:
-            </div>
-            <div style="font-size:20pt;font-weight:800;color:#7c3aed;letter-spacing:-0.5px;">
-                ${Helpers.fmt(result.total)} ₽
-            </div>
+            <div style="font-size:9.5pt;color:#6d28d9;margin-bottom:6px;">Стоимость для ${clientName}:</div>
+            <div style="font-size:20pt;font-weight:800;color:#7c3aed;letter-spacing:-0.5px;">${Helpers.fmt(result.total)} ₽</div>
         </div>`;
-
-    const helpUrl = isTypical
-        ? 'https://astral.ru/help/1s-epd/1s-epd-tipovoe-reshenie/obshchaya-informatsiya/nachalo-raboty-s-1s-epd/'
-        : 'https://astral.ru/help/1s-epd/1s-epd-proektnoe-reshenie/';
 
     const contactBlock = `
         <div style="border:1px solid #ede8ff;border-radius:10px;padding:14px 20px;margin-top:12px;display:flex;justify-content:space-between;align-items:center;">
@@ -1109,13 +1086,13 @@ window.downloadKP = async () => {
                 <div style="font-size:8.5pt;color:#888;">Свяжитесь с нами, чтобы подключить сервис</div>
             </div>
             <div style="text-align:right;font-size:9pt;color:#1a1a2e;line-height:1.7;">
-                ${partnerName  ? `<div style="font-weight:600;">${partnerName}</div>`  : ''}
+                ${partnerName  ? `<div style="font-weight:600;">${partnerName}</div>` : ''}
                 ${partnerPhone ? `<div>${partnerPhone}</div>` : ''}
                 ${partnerEmail ? `<div>${partnerEmail}</div>` : ''}
             </div>
         </div>`;
 
-    // ── Данные клиентов ───────────────────────────────────────────────────
+    // ── Данные клиентов (только для типового КП) ─────────────────────────
     const contactUrl  = 'https://astral.ru/contacts/';
     const clientsData = [
         { text: 'ГУП «Мосгортранс»',                                       url: 'https://1c-epd.ru/cases/pervyy-v-rossii-elektronnyy-putevoy-list-proveden-gup-mosgortrans-cherez-servis-1s-epd/' },
@@ -1126,10 +1103,11 @@ window.downloadKP = async () => {
         { text: '«Транспорт Ярославии»',                                    url: 'https://1c-epd.ru/cases/ob-aktivnom-vnedrenii-gis-epd/' },
     ];
 
+    // ── Блок клиентов для типового КП (с уменьшенным межстрочным) ────────
     const clientsBlockContent = `
         <div style="padding:24px 44px 30px;">
             <div style="font-size:16pt;font-weight:800;color:#7c3aed;margin-bottom:12px;">С нами работают:</div>
-            <ul style="margin:0 0 24px 18px;padding:0;list-style:disc;font-size:18pt;line-height:1.4;">
+            <ul style="margin:0 0 20px 18px;padding:0;list-style:disc;font-size:18pt;line-height:1.45;">
                 ${clientsData.slice(0, -1).map(c => `
                     <li style="margin-bottom:0;">
                         <span style="font-size:12pt;vertical-align:middle;">
@@ -1143,11 +1121,28 @@ window.downloadKP = async () => {
                     </span>
                 </li>
             </ul>
-            <div style="font-size:16pt;font-weight:800;color:#7c3aed;margin-bottom:8px;">Как подключиться?</div>
-            <div style="font-size:14pt;color:#1a1a2e;padding-left:4px;">
-                <a href="${contactUrl}" style="color:#7c3aed;text-decoration:underline;">Свяжитесь с нами</a>,
-                чтобы подключить сервис
-            </div>
+            ${contactBlock}
+        </div>`;
+
+    // ── Блок контактов для проектного КП (со списком клиентов) ───────────
+    const projectContactBlock = `
+        <div style="padding:24px 44px 30px;">
+            <div style="font-size:16pt;font-weight:800;color:#7c3aed;margin-bottom:12px;">С нами работают:</div>
+            <ul style="margin:0 0 20px 18px;padding:0;list-style:disc;font-size:18pt;line-height:1.45;">
+                ${clientsData.slice(0, -1).map(c => `
+                    <li style="margin-bottom:0;">
+                        <span style="font-size:12pt;vertical-align:middle;">
+                            <a href="${c.url}" style="color:#7c3aed;text-decoration:underline;">${c.text}</a>
+                        </span>
+                    </li>`).join('')}
+                <li style="margin-bottom:0;">
+                    <span style="font-size:12pt;vertical-align:middle;">
+                        <a href="${clientsData[clientsData.length-1].url}" style="color:#7c3aed;text-decoration:underline;">${clientsData[clientsData.length-1].text}</a>
+                        <span style="color:#1a1a2e;"> и другие.</span>
+                    </span>
+                </li>
+            </ul>
+            ${contactBlock}
         </div>`;
 
     // ── Вспомогательные HTML-блоки для замеров ───────────────────────────
@@ -1215,10 +1210,7 @@ window.downloadKP = async () => {
         for (let i = 0; i < lines.length; i++) {
             const rowH = await measureHeight(tableHeaderHTML + buildSingleRow(lines[i]) + tableFooterHTML) - tableHeaderH;
             accumulated += rowH;
-            if (accumulated > available) {
-                splitIdx = i;
-                break;
-            }
+            if (accumulated > available) { splitIdx = i; break; }
         }
         return splitIdx;
     }
@@ -1244,13 +1236,11 @@ window.downloadKP = async () => {
     const linesPage1 = overflowMode === 'rows' ? lines.slice(0, splitIdx) : lines;
     const linesPage2 = overflowMode === 'rows' ? lines.slice(splitIdx)    : [];
 
-    // Что идёт внизу стр.1
     const page1Bottom =
         overflowMode === 'none'             ? summaryContactHTML :
         overflowMode === 'contacts'         ? summaryOnlyHTML    :
         '';
 
-    // Что идёт вверху стр.2 (перед middle)
     const page2Top =
         overflowMode === 'contacts'         ? contactOnlyHTML :
         overflowMode === 'summary+contacts' ? summaryContactHTML :
@@ -1278,11 +1268,12 @@ window.downloadKP = async () => {
             ${page1Bottom}
         </div>`;
 
+    // Стр.2: типовое — список клиентов + контакты, проектное — только контакты
     const page2HTML = `
         <div style="width:794px;background:#fff;box-sizing:border-box;">
             ${page2Top}
             ${b64Middle ? `<img src="${b64Middle}" style="width:794px;display:block;">` : ''}
-            ${isTypical ? clientsBlockContent : ''}
+            ${isTypical ? clientsBlockContent : projectContactBlock}
         </div>`;
 
     const page3HTML = `
@@ -1372,7 +1363,9 @@ window.downloadKP = async () => {
             const imgH    = (canvas.height / canvas.width) * PDF_W;
 
             if (i > 0) doc.addPage();
-            doc.addImage(imgData, 'JPEG', 0, 0, PDF_W, Math.min(imgH, PDF_H));
+            if (imgH > 0 && canvas.width > 0) {
+                doc.addImage(imgData, 'JPEG', 0, 0, PDF_W, Math.min(imgH, PDF_H));
+            }
 
             if (i === 0) page1LinkCoords.forEach(c => doc.link(c.x, c.y, c.width, c.height, { url: c.url }));
             if (i === 1) page2LinkCoords.forEach(c => doc.link(c.x, c.y, c.width, c.height, { url: c.url }));
