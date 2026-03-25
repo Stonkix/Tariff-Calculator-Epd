@@ -55,7 +55,7 @@ const CONSTANTS = {
             id: 'service', title: 'Внедрение и обучение',
             items: [
                 { id: 'i1', label: 'Типовая установка', keyRef: 'install_base' },
-                { id: 't1', label: 'Обучение (1 группа)', keyRef: 'training' },
+                { id: 't1', label: 'Обучение (1 группа до 5 человек/час)', keyRef: 'training' },
                 { id: 'ps1', label: 'Проектное обследование (1 час)', keyRef: 'project_survey' }
             ]
         }
