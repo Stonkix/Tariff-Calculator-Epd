@@ -26,7 +26,8 @@ const CONSTANTS = {
             setup_win_2: "OC Windows\nnalog.ru и ЕСИА",
             setup_mac_1: "OC MacOS nalog.ru или ЕСИА",
             setup_mac_2: "OC MacOS nalog.ru и ЕСИА",
-            install_base: "Типовая Установка пр",
+            typical_setup: "Типовая установка",
+            project_setup: "Проектная установка",
             training: "Обучение пользователей по работе с Пр",
             goslog_win: "Регистрация на платформе «ГосЛог»\nOC Windows",
             goslog_mac: "Регистрация на платформе «ГосЛог»\nOC MacOS",
@@ -34,7 +35,8 @@ const CONSTANTS = {
         }
     },
     LIMITS: [600, 1000, 5000, 10000, 50000, 100000],
-    ADDONS: [
+
+ADDONS: [
         {
             id: 'setup', title: 'Удалённая настройка рабочего места',
             items: [
@@ -54,7 +56,8 @@ const CONSTANTS = {
         {
             id: 'service', title: 'Внедрение и обучение',
             items: [
-                { id: 'i1', label: 'Типовая установка', keyRef: 'install_base' },
+                { id: 'setup_typical', label: 'Типовая настройка', keyRef: 'typical_setup' },
+                { id: 'setup_project',  label: 'Проектная установка', keyRef: 'project_setup' },
                 { id: 't1', label: 'Обучение (1 группа до 5 человек/час)', keyRef: 'training' },
                 { id: 'ps1', label: 'Проектное обследование (1 час)', keyRef: 'project_survey' }
             ]
@@ -91,6 +94,87 @@ const State = {
         CONSTANTS.ADDONS.forEach(addon => {
             this.data.addons[addon.id] = { enabled: false, values: {} };
         });
+    },
+
+    resetCalculation() {
+        // Сброс основных параметров расчета
+        this.data.docsYearly = 0;
+        this.data.customDocsCount = null;
+        this.data.customPrices = {};
+        
+        // Сброс электронных подписей
+        this.data.ukepQty = 0;
+        this.data.ukepPeriod = 12;
+        this.data.sigType = null;
+        this.data.kcrDetails = { egais: 0, univ: 0, basis: 0 };
+        
+        // Сброс МЧД
+        this.data.mchd = {
+            base: { active: false, qty: 0 },
+            ext: { active: false, qty: 0 },
+            single: { active: false, qty: 0 },
+            extra: { active: false, qty: 0 }
+        };
+        
+        // Сброс сервисных услуг
+        this.data.addons = {};
+        this.initAddons();
+        
+        // Сброс полей ввода количества документов
+        const docsMonthInput = document.getElementById('docs-month');
+        const docsYearInput = document.getElementById('docs-year');
+        if (docsMonthInput) docsMonthInput.value = '';
+        if (docsYearInput) docsYearInput.value = '';
+        
+        // Сброс поля общего количества сотрудников
+        const ukepQtyInput = document.getElementById('ukep-qty');
+        if (ukepQtyInput) ukepQtyInput.value = '';
+        
+        // Сброс чекбоксов подписей
+        const checkBasis = document.getElementById('check-basis');
+        const checkKcr = document.getElementById('check-kcr');
+        if (checkBasis) checkBasis.checked = false;
+        if (checkKcr) checkKcr.checked = false;
+        
+        // Сброс полей КЦР
+        document.querySelectorAll('[data-action="kcr-qty"]').forEach(input => {
+            input.value = '';
+        });
+        
+        // Сброс чекбоксов и полей МЧД
+        CONSTANTS.MCHD_TYPES.forEach(type => {
+            const checkbox = document.getElementById(`check-mchd-${type}`);
+            const input = document.getElementById(`input-mchd-${type}`);
+            if (checkbox) checkbox.checked = false;
+            if (input) input.value = '';
+        });
+        
+        // Сброс периода УКЭП на 12 месяцев
+        document.querySelectorAll('[data-click="set-ukep-period"]').forEach(btn => {
+            btn.classList.toggle('selected', btn.dataset.val === '12');
+        });
+        
+        // Очистка динамического контента
+        const dynamicContent = document.getElementById('dynamic-content');
+        if (dynamicContent) {
+            dynamicContent.innerHTML = `
+                <div class="placeholder-text">
+                    Здесь будут параметры тарифа... <br>
+                    <strong>Введите количество документов</strong>
+                </div>`;
+        }
+        
+        // Очистка детализации
+        const detailsContent = document.getElementById('details-content');
+        if (detailsContent) {
+            detailsContent.innerHTML = 'Введите данные для расчета...';
+        }
+        
+        // Обнуление итоговой суммы
+        const totalPrice = document.getElementById('total-price');
+        if (totalPrice) {
+            totalPrice.textContent = '0 ₽';
+        }
     },
 
     getPrice(key) {
@@ -434,20 +518,33 @@ const UI = {
         ids.forEach(id => this.els[id] = document.getElementById(id));
     },
 
-    renderAddonsHTML() {
-        const container = document.getElementById('addons-container');
-        if(!container) return;
-        
-        const isInd = State.data.subMode === 'individual';
+renderAddonsHTML() {
+    const container = document.getElementById('addons-container');
+    if (!container) return;
 
-        container.innerHTML = `<h3 class="section-title">Сервисные услуги</h3>` + CONSTANTS.ADDONS.map(addon => {
+    const isInd = State.data.subMode === 'individual';
+    const currentMode = State.data.mainMode;   // 'typical' или 'project'
+
+    container.innerHTML = `<h3 class="section-title">Сервисные услуги</h3>` + 
+        CONSTANTS.ADDONS.map(addon => {
+            let itemsToRender = addon.items;
+
+            // ← ФИЛЬТРАЦИЯ по режиму только для блока "Внедрение и обучение"
+            if (addon.id === 'service') {
+                itemsToRender = addon.items.filter(item => {
+                    if (item.keyRef === 'typical_setup') return currentMode === 'typical';
+                    if (item.keyRef === 'project_setup')  return currentMode === 'project';
+                    return true; // обучение и обследование — всегда показываем
+                });
+            }
+
             const addonState = State.data.addons[addon.id];
-            
+
             const customPriceBlock = isInd ? `
                 <details class="card-price-details" style="margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px;">
                     <summary class="custom-price-summary">Изменить стоимость</summary>
                     <div class="custom-price-content">
-                        ${addon.items.map(item => {
+                        ${itemsToRender.map(item => {
                             const savedPrice = State.data.customPrices[item.keyRef] || '';
                             const defaultPrice = State.getPrice(CONSTANTS.KEYS.services[item.keyRef]);
                             const labelText = item.label.replace(/<[^>]*>/g, '');
@@ -473,7 +570,7 @@ const UI = {
                         </label>
                     </div>
                     <div id="addon-items-${addon.id}" style="display:${addonState.enabled ? 'block' : 'none'}; margin-top:10px;">
-                        ${addon.items.map(item => `
+                        ${itemsToRender.map(item => `
                             <div class="variant-row">
                                 <span class="v-label">${item.label}</span>
                                 <div class="v-controls">
@@ -488,7 +585,7 @@ const UI = {
                     </div>
                 </div>`;
         }).join('');
-    },
+},
 
     update() {
         const result = Calculator.calculateAll();
@@ -896,6 +993,11 @@ const UI = {
             t.classList.add('selected');
             
             State.data.mainMode = t.dataset.val;
+            
+            // Сброс всех расчетов при переключении между типовым и проектным решением
+            State.resetCalculation();
+            
+            this.renderAddonsHTML();
             this.update();
         }
         else if (act === 'set-submode') {
