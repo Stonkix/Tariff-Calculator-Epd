@@ -19,7 +19,8 @@ const CONSTANTS = {
             base: "МЧД Базовый на 1 год(5 мчд)",
             ext: "МЧД Расширенный на 1 год",
             single: "Одна МЧД",
-            extra: "Дополнительные МЧД "
+            extra: "Дополнительные МЧД ",
+            start: "Старт работы с МЧД в сервисе Астрал Доверенность"
         },
         services: {
             setup_win_1: "OC Windows\nnalog.ru или ЕСИА",
@@ -36,7 +37,7 @@ const CONSTANTS = {
     },
     LIMITS: [600, 1000, 5000, 10000, 50000, 100000],
 
-ADDONS: [
+    ADDONS: [
         {
             id: 'setup', title: 'Удалённая настройка рабочего места',
             items: [
@@ -63,7 +64,7 @@ ADDONS: [
             ]
         }
     ],
-    MCHD_TYPES: ['base', 'ext', 'single', 'extra']
+    MCHD_TYPES: ['base', 'ext', 'single', 'extra', 'start']
 };
 
 /**
@@ -85,7 +86,8 @@ const State = {
             base: { active: false, qty: 0 },
             ext: { active: false, qty: 0 },
             single: { active: false, qty: 0 },
-            extra: { active: false, qty: 0 }
+            extra: { active: false, qty: 0 },
+            start: { active: false, qty: 0 }
         },
         addons: {},
     },
@@ -97,64 +99,56 @@ const State = {
     },
 
     resetCalculation() {
-        // Сброс основных параметров расчета
         this.data.docsYearly = 0;
         this.data.customDocsCount = null;
         this.data.customPrices = {};
         
-        // Сброс электронных подписей
         this.data.ukepQty = 0;
         this.data.ukepPeriod = 12;
         this.data.sigType = null;
         this.data.kcrDetails = { egais: 0, univ: 0, basis: 0 };
         
-        // Сброс МЧД
         this.data.mchd = {
             base: { active: false, qty: 0 },
             ext: { active: false, qty: 0 },
             single: { active: false, qty: 0 },
-            extra: { active: false, qty: 0 }
+            extra: { active: false, qty: 0 },
+            start: { active: false, qty: 0 }
         };
         
-        // Сброс сервисных услуг
         this.data.addons = {};
         this.initAddons();
         
-        // Сброс полей ввода количества документов
         const docsMonthInput = document.getElementById('docs-month');
         const docsYearInput = document.getElementById('docs-year');
         if (docsMonthInput) docsMonthInput.value = '';
         if (docsYearInput) docsYearInput.value = '';
         
-        // Сброс поля общего количества сотрудников
         const ukepQtyInput = document.getElementById('ukep-qty');
         if (ukepQtyInput) ukepQtyInput.value = '';
         
-        // Сброс чекбоксов подписей
         const checkBasis = document.getElementById('check-basis');
         const checkKcr = document.getElementById('check-kcr');
         if (checkBasis) checkBasis.checked = false;
         if (checkKcr) checkKcr.checked = false;
         
-        // Сброс полей КЦР
         document.querySelectorAll('[data-action="kcr-qty"]').forEach(input => {
             input.value = '';
         });
         
-        // Сброс чекбоксов и полей МЧД
         CONSTANTS.MCHD_TYPES.forEach(type => {
             const checkbox = document.getElementById(`check-mchd-${type}`);
             const input = document.getElementById(`input-mchd-${type}`);
+            const card = document.getElementById(`card-mchd-${type}`);
             if (checkbox) checkbox.checked = false;
             if (input) input.value = '';
+            if (card) card.classList.remove('active');
         });
         
-        // Сброс периода УКЭП на 12 месяцев
         document.querySelectorAll('[data-click="set-ukep-period"]').forEach(btn => {
             btn.classList.toggle('selected', btn.dataset.val === '12');
         });
         
-        // Очистка динамического контента
         const dynamicContent = document.getElementById('dynamic-content');
         if (dynamicContent) {
             dynamicContent.innerHTML = `
@@ -164,13 +158,11 @@ const State = {
                 </div>`;
         }
         
-        // Очистка детализации
         const detailsContent = document.getElementById('details-content');
         if (detailsContent) {
             detailsContent.innerHTML = 'Введите данные для расчета...';
         }
         
-        // Обнуление итоговой суммы
         const totalPrice = document.getElementById('total-price');
         if (totalPrice) {
             totalPrice.textContent = '0 ₽';
@@ -454,7 +446,8 @@ const Calculator = {
                 
                 const name = (type === 'base') ? 'МЧД Базовый' : 
                              (type === 'ext') ? 'МЧД Расширенный' :
-                             (type === 'single') ? 'Одна МЧД' : 'Доп. МЧД';
+                             (type === 'single') ? 'Одна МЧД' :
+                             (type === 'extra') ? 'Доп. МЧД' : 'Старт МЧД (Астрал Доверенность)';
                 
                 if (item.qty > 1) {
                     lines.push(`${name} ${Helpers.fmt(price)} ₽ x ${item.qty}: ${Helpers.fmt(sum)} ₽`);
@@ -518,74 +511,73 @@ const UI = {
         ids.forEach(id => this.els[id] = document.getElementById(id));
     },
 
-renderAddonsHTML() {
-    const container = document.getElementById('addons-container');
-    if (!container) return;
+    renderAddonsHTML() {
+        const container = document.getElementById('addons-container');
+        if (!container) return;
 
-    const isInd = State.data.subMode === 'individual';
-    const currentMode = State.data.mainMode;   // 'typical' или 'project'
+        const isInd = State.data.subMode === 'individual';
+        const currentMode = State.data.mainMode;
 
-    container.innerHTML = `<h3 class="section-title">Сервисные услуги</h3>` + 
-        CONSTANTS.ADDONS.map(addon => {
-            let itemsToRender = addon.items;
+        container.innerHTML = `<h3 class="section-title">Сервисные услуги</h3>` + 
+            CONSTANTS.ADDONS.map(addon => {
+                let itemsToRender = addon.items;
 
-            // ← ФИЛЬТРАЦИЯ по режиму только для блока "Внедрение и обучение"
-            if (addon.id === 'service') {
-                itemsToRender = addon.items.filter(item => {
-                    if (item.keyRef === 'typical_setup') return currentMode === 'typical';
-                    if (item.keyRef === 'project_setup')  return currentMode === 'project';
-                    return true; // обучение и обследование — всегда показываем
-                });
-            }
+                if (addon.id === 'service') {
+                    itemsToRender = addon.items.filter(item => {
+                        if (item.keyRef === 'typical_setup') return currentMode === 'typical';
+                        if (item.keyRef === 'project_setup')  return currentMode === 'project';
+                        return true;
+                    });
+                }
 
-            const addonState = State.data.addons[addon.id];
+                const addonState = State.data.addons[addon.id];
 
-            const customPriceBlock = isInd ? `
-                <details class="card-price-details" style="margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px;">
-                    <summary class="custom-price-summary">Изменить стоимость</summary>
-                    <div class="custom-price-content">
-                        ${itemsToRender.map(item => {
-                            const savedPrice = State.data.customPrices[item.keyRef] || '';
-                            const defaultPrice = State.getPrice(CONSTANTS.KEYS.services[item.keyRef]);
-                            const labelText = item.label.replace(/<[^>]*>/g, '');
-                            return `
-                            <div class="custom-price-row">
-                                <span>${labelText}</span>
-                                <input type="number" min="0" value="${savedPrice}" placeholder="${defaultPrice}" 
-                                    class="custom-price-input"
-                                    onkeydown="if(['-', 'e', 'E', ',', '.'].includes(event.key)) event.preventDefault();" 
-                                    oninput="window.updateServicePrice('${item.keyRef}', this.value)">
-                            </div>`;
-                        }).join('')}
-                    </div>
-                </details>` : '';
+                const customPriceBlock = isInd ? `
+                    <details class="card-price-details" style="margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px;">
+                        <summary class="custom-price-summary">Изменить стоимость</summary>
+                        <div class="custom-price-content">
+                            ${itemsToRender.map(item => {
+                                const savedPrice = State.data.customPrices[item.keyRef] || '';
+                                const defaultPrice = State.getPrice(CONSTANTS.KEYS.services[item.keyRef]);
+                                const labelText = item.label.replace(/<[^>]*>/g, '');
+                                return `
+                                <div class="custom-price-row">
+                                    <span>${labelText}</span>
+                                    <input type="number" min="0" value="${savedPrice}" placeholder="${defaultPrice}" 
+                                        class="custom-price-input"
+                                        onkeydown="if(['-', 'e', 'E', ',', '.'].includes(event.key)) event.preventDefault();" 
+                                        oninput="window.updateServicePrice('${item.keyRef}', this.value)">
+                                </div>`;
+                            }).join('')}
+                        </div>
+                    </details>` : '';
 
-            return `
-                <div class="addon-card ${addonState.enabled ? 'active' : ''}" id="addon-card-${addon.id}">
-                    <div class="addon-header">
-                        <span class="addon-title">${addon.title}</span>
-                        <label class="custom-switch">
-                            <input type="checkbox" data-action="toggle-addon" data-id="${addon.id}" ${addonState.enabled ? 'checked' : ''}>
-                            <span class="slider round"></span>
-                        </label>
-                    </div>
-                    <div id="addon-items-${addon.id}" style="display:${addonState.enabled ? 'block' : 'none'}; margin-top:10px;">
-                        ${itemsToRender.map(item => `
-                            <div class="variant-row">
-                                <span class="v-label">${item.label}</span>
-                                <div class="v-controls">
-                                    <input type="number" class="qty-input" min="0" 
-                                        value="${addonState.values[item.id] || ''}"
-                                        placeholder="0" 
-                                        data-action="update-addon" data-addon="${addon.id}" data-item="${item.id}">
-                                    <span class="unit-text">шт.</span>
-                                </div>
-                            </div>`).join('')}
-                        ${customPriceBlock}
-                    </div>
-                </div>`;
-        }).join('');
-},
+                return `
+                    <div class="addon-card ${addonState.enabled ? 'active' : ''}" id="addon-card-${addon.id}">
+                        <div class="addon-header">
+                            <span class="addon-title">${addon.title}</span>
+                            <label class="custom-switch">
+                                <input type="checkbox" data-action="toggle-addon" data-id="${addon.id}" ${addonState.enabled ? 'checked' : ''}>
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                        <div id="addon-items-${addon.id}" style="display:${addonState.enabled ? 'block' : 'none'}; margin-top:10px;">
+                            ${itemsToRender.map(item => `
+                                <div class="variant-row">
+                                    <span class="v-label">${item.label}</span>
+                                    <div class="v-controls">
+                                        <input type="number" class="qty-input" min="0" 
+                                            value="${addonState.values[item.id] || ''}"
+                                            placeholder="0" 
+                                            data-action="update-addon" data-addon="${addon.id}" data-item="${item.id}">
+                                        <span class="unit-text">шт.</span>
+                                    </div>
+                                </div>`).join('')}
+                            ${customPriceBlock}
+                        </div>
+                    </div>`;
+            }).join('');
+    },
 
     update() {
         const result = Calculator.calculateAll();
@@ -812,10 +804,11 @@ renderAddonsHTML() {
 
     updateMCHDPricing(isInd) {
         const mchdTypes = [
-            { id: 'base', key: CONSTANTS.KEYS.mchd.base, name: 'Базовый' },
-            { id: 'ext', key: CONSTANTS.KEYS.mchd.ext, name: 'Расширенный' },
+            { id: 'base',   key: CONSTANTS.KEYS.mchd.base,   name: 'Базовый' },
+            { id: 'ext',    key: CONSTANTS.KEYS.mchd.ext,    name: 'Расширенный' },
             { id: 'single', key: CONSTANTS.KEYS.mchd.single, name: 'Одна МЧД' },
-            { id: 'extra', key: CONSTANTS.KEYS.mchd.extra, name: 'Доп. МЧД' }
+            { id: 'extra',  key: CONSTANTS.KEYS.mchd.extra,  name: 'Доп. МЧД' },
+            { id: 'start',  key: CONSTANTS.KEYS.mchd.start,  name: 'Старт МЧД (Астрал Доверенность)' }
         ];
 
         mchdTypes.forEach(type => {
@@ -850,28 +843,14 @@ renderAddonsHTML() {
         document.body.addEventListener('input', (e) => this.handleInput(e));
         document.body.addEventListener('change', (e) => this.handleChange(e));
         document.body.addEventListener('click', (e) => this.handleClick(e));
-        
-        // ФИX: Убираем принудительное обнуление в blur.
-        // Поля с placeholder="0" визуально показывают 0 когда пусты,
-        // но value остаётся '' — это корректное поведение для всех полей qty.
-        // Принудительное value='0' при blur ломало UX: курсор уходил в конец цифры 0.
 
         document.body.addEventListener('focus', (e) => {
             const t = e.target;
-            // Только для qty-полей (не tariff-field-input и не custom-price-input)
             if (t.type === 'number' && t.classList.contains('qty-input')) {
-                // Если значение равно '0' — очищаем для удобного ввода
                 if (t.value === '0') {
                     t.value = '';
                 }
             }
-        }, true);
-        
-        document.body.addEventListener('blur', (e) => {
-            const t = e.target;
-            // Только для qty-полей — при потере фокуса с пустым значением 
-            // НЕ ставим '0', просто оставляем пустым (placeholder='0' покажет 0 визуально)
-            // Это обеспечивает одинаковое поведение с полями сервисных услуг
         }, true);
     },
 
@@ -957,13 +936,11 @@ renderAddonsHTML() {
             
             document.getElementById(`card-mchd-${type}`).classList.toggle('active', checked);
             if (checked) {
-                // При активации устанавливаем значение 1 если было 0 или пусто
                 if (!State.data.mchd[type].qty) {
                     State.data.mchd[type].qty = 1;
                     document.getElementById(`input-mchd-${type}`).value = 1;
                 }
             } else {
-                // При деактивации обнуляем количество и очищаем поле ввода
                 State.data.mchd[type].qty = 0;
                 const inputField = document.getElementById(`input-mchd-${type}`);
                 if (inputField) {
@@ -994,7 +971,6 @@ renderAddonsHTML() {
             
             State.data.mainMode = t.dataset.val;
             
-            // Сброс всех расчетов при переключении между типовым и проектным решением
             State.resetCalculation();
             
             this.renderAddonsHTML();
@@ -1028,11 +1004,6 @@ renderAddonsHTML() {
 document.addEventListener('DOMContentLoaded', async () => {
     State.initAddons();
     UI.init();
-
-    // ФИX: Не инициализируем поля значением '0' принудительно.
-    // Поля имеют placeholder="0" в HTML — этого достаточно для визуального отображения.
-    // Принудительная установка value='0' приводила к тому, что при клике
-    // курсор вставал в конец числа '0' вместо очистки поля.
 
     const contactFields = ['partner-name', 'partner-phone', 'partner-email', 'client-name'];
     contactFields.forEach(fieldId => {
@@ -1194,7 +1165,6 @@ window.downloadKP = async () => {
             </div>
         </div>`;
 
-    // ── Данные клиентов (только для типового КП) ─────────────────────────
     const contactUrl  = 'https://astral.ru/contacts/';
     const clientsData = [
         { text: 'ГУП «Мосгортранс»',                                       url: 'https://1c-epd.ru/cases/pervyy-v-rossii-elektronnyy-putevoy-list-proveden-gup-mosgortrans-cherez-servis-1s-epd/' },
@@ -1205,7 +1175,6 @@ window.downloadKP = async () => {
         { text: '«Транспорт Ярославии»',                                    url: 'https://1c-epd.ru/cases/ob-aktivnom-vnedrenii-gis-epd/' },
     ];
 
-    // ── Блок клиентов для типового КП (с уменьшенным межстрочным) ────────
     const clientsBlockContent = `
         <div style="padding:24px 44px 30px;">
             <div style="font-size:16pt;font-weight:800;color:#7c3aed;margin-bottom:12px;">С нами работают:</div>
@@ -1226,7 +1195,6 @@ window.downloadKP = async () => {
             ${contactBlock}
         </div>`;
 
-    // ── Блок контактов для проектного КП (со списком клиентов) ───────────
     const projectContactBlock = `
         <div style="padding:24px 44px 30px;">
             <div style="font-size:16pt;font-weight:800;color:#7c3aed;margin-bottom:12px;">С нами работают:</div>
@@ -1247,7 +1215,6 @@ window.downloadKP = async () => {
             ${contactBlock}
         </div>`;
 
-    // ── Вспомогательные HTML-блоки для замеров ───────────────────────────
     const summaryContactHTML = `
         <div style="padding:0 44px 30px;">
             ${summaryBlock}
@@ -1272,7 +1239,6 @@ window.downloadKP = async () => {
                 <tbody>`;
     const tableFooterHTML = `</tbody></table></div>`;
 
-    // ── Замер высоты блока ───────────────────────────────────────────────
     async function measureHeight(htmlContent) {
         const div = document.createElement('div');
         div.style.cssText = 'position:absolute;top:-9999px;left:0;width:794px;background:#fff;visibility:hidden;';
@@ -1284,7 +1250,6 @@ window.downloadKP = async () => {
         return h;
     }
 
-    // ── Измеряем реальную высоту header-картинки ─────────────────────────
     async function measureImgHeight(b64) {
         if (!b64) return 0;
         return new Promise(resolve => {
@@ -1356,7 +1321,6 @@ window.downloadKP = async () => {
             ${summaryContactHTML}` :
         '';
 
-    // ── СТРАНИЦЫ ──────────────────────────────────────────────────────────
     const page1HTML = `
         <div style="width:794px;background:#fff;box-sizing:border-box;">
             ${b64Header ? `<img src="${b64Header}" style="width:794px;display:block;">` : ''}
@@ -1370,7 +1334,6 @@ window.downloadKP = async () => {
             ${page1Bottom}
         </div>`;
 
-    // Стр.2: типовое — список клиентов + контакты, проектное — только контакты
     const page2HTML = `
         <div style="width:794px;background:#fff;box-sizing:border-box;">
             ${page2Top}
@@ -1383,7 +1346,6 @@ window.downloadKP = async () => {
             ${b64Footer ? `<img src="${b64Footer}" style="width:794px;display:block;">` : ''}
         </div>`;
 
-    // ── PDF ───────────────────────────────────────────────────────────────
     const PDF_W = 595.28;
     const PDF_H = 841.89;
 
