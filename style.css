@@ -494,10 +494,32 @@ input:disabled + .slider {
     gap: 8px;
 }
 
+.variant-text {
+    flex: 1;
+    min-width: 0;
+    padding-right: 8px;
+}
+
 .v-label {
     color: var(--text);
-    flex: 1;
-    padding-right: 8px;
+    display: block;
+}
+
+.variant-meta {
+    display: block;
+    margin-top: 4px;
+    font-size: 11px;
+    color: #8a6db0;
+    line-height: 1.4;
+}
+
+.variant-row-hourly .unit-text {
+    color: var(--primary);
+    font-weight: 600;
+}
+
+.variant-row-placeholder .variant-meta {
+    color: #9b7c42;
 }
 
 /* Анимация появления */

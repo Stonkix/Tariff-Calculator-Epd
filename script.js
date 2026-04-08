@@ -32,7 +32,16 @@ const CONSTANTS = {
             training: "Обучение пользователей по работе с Пр",
             goslog_win: "Регистрация на платформе «ГосЛог»\nOC Windows",
             goslog_mac: "Регистрация на платформе «ГосЛог»\nOC MacOS",
-            project_survey: "Проектное обследование"
+            project_survey: "Проектное обследование",
+            epd_start_tr_first: "Старт работы с ЭПД на 1-м рабочем месте (ТР)",
+            epd_start_tr_next: "Старт работы с ЭПД на 2-м и последующих рабочих местах (ТР)",
+            epd_start_pr_first: "Старт работы с ЭПД на 1-м рабочем месте (ПР)",
+            epd_start_pr_next: "Старт работы с ЭПД  на 2-м и последующих рабочих местах (ПР)",
+            epd_training_tr: "Обучение и консультация по запуску работы в 1С-ЭПД (ТР)",
+            epd_training_pr: "Обучение и консультация по запуску работы в 1С-ЭПД (ПР)",
+            epd_transition_survey: "Предпроектное обследование по переходу на ЭПД",
+            epd_goslog_support: "Настройка рабочего места и техническая поддержка по регистрации на платформе ГосЛог (для экспедиторов)",
+            epd_config_update: "Доработка конфигурации 1С для работы с ЭПД"
         }
     },
     LIMITS: [600, 1000, 5000, 10000, 50000, 100000],
@@ -57,10 +66,24 @@ const CONSTANTS = {
         {
             id: 'service', title: 'Внедрение и обучение',
             items: [
-                { id: 'setup_typical', label: 'Типовая настройка', keyRef: 'typical_setup' },
-                { id: 'setup_project',  label: 'Проектная установка', keyRef: 'project_setup' },
+                { id: 'setup_typical', label: 'Типовая настройка', keyRef: 'typical_setup', modes: ['typical'] },
+                { id: 'setup_project',  label: 'Проектная установка', keyRef: 'project_setup', modes: ['project'] },
                 { id: 't1', label: 'Обучение (1 группа до 5 человек/час)', keyRef: 'training' },
                 { id: 'ps1', label: 'Проектное обследование (1 час)', keyRef: 'project_survey' }
+            ]
+        },
+        {
+            id: 'epd_launch', title: 'Старт и сопровождение 1С-ЭПД',
+            items: [
+                { id: 'epd_start_tr_first', label: 'Старт работы с ЭПД на 1-м рабочем месте (ТР)', keyRef: 'epd_start_tr_first', modes: ['typical'] },
+                { id: 'epd_start_tr_next', label: 'Старт работы с ЭПД на 2-м и последующих рабочих местах (ТР)', keyRef: 'epd_start_tr_next', modes: ['typical'] },
+                { id: 'epd_start_pr_first', label: 'Старт работы с ЭПД на 1-м рабочем месте (ПР)', keyRef: 'epd_start_pr_first', modes: ['project'] },
+                { id: 'epd_start_pr_next', label: 'Старт работы с ЭПД на 2-м и последующих рабочих местах (ПР)', keyRef: 'epd_start_pr_next', modes: ['project'] },
+                { id: 'epd_training_tr', label: 'Обучение и консультация по запуску работы в 1С-ЭПД (ТР)', keyRef: 'epd_training_tr', modes: ['typical'] },
+                { id: 'epd_training_pr', label: 'Обучение и консультация по запуску работы в 1С-ЭПД (ПР)', keyRef: 'epd_training_pr', modes: ['project'] },
+                { id: 'epd_transition_survey', label: 'Предпроектное обследование по переходу на ЭПД', keyRef: 'epd_transition_survey', modes: ['project'] },
+                { id: 'epd_goslog_support', label: 'Настройка рабочего места и техническая поддержка по регистрации на платформе ГосЛог (для экспедиторов)', keyRef: 'epd_goslog_support' },
+                { id: 'epd_config_update', label: 'Доработка конфигурации 1С для работы с ЭПД', keyRef: 'epd_config_update', modes: ['project'] }
             ]
         }
     ],
@@ -173,10 +196,20 @@ const State = {
         if (!this.data.pricing.length || !key) return 0;
         return Helpers.parseNum(this.data.pricing[0][key]);
     },
+
+    getRawPrice(key, rowIndex = 0) {
+        if (!this.data.pricing[rowIndex] || !key) return undefined;
+        return this.data.pricing[rowIndex][key];
+    },
     
     getUnitPrice(key) {
         if (!this.data.pricing.length || !key) return 0;
         return Helpers.parseNum(this.data.pricing[1][key]);
+    },
+
+    getMinimumPrice(key) {
+        if (!this.data.pricing[2] || !key) return 0;
+        return Helpers.parseNum(this.data.pricing[2][key]);
     }
 };
 
@@ -189,6 +222,8 @@ const Helpers = {
         let cleaned = val.toString().replace(/\u00A0/g, '').replace(/\s/g, '').replace(',', '.');
         return parseFloat(cleaned) || 0;
     },
+    stripHtml: (text) => (text || '').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim(),
+    isPlaceholderPrice: (val) => typeof val === 'string' && val.trim() === '-',
     fmt: (num) => Math.round(num).toLocaleString('ru-RU'),
     fmtDecimal: (num) => {
         if (num % 1 === 0) return Math.round(num).toLocaleString('ru-RU');
@@ -462,28 +497,50 @@ const Calculator = {
     calcAddons() {
         let cost = 0;
         let lines = [];
+        const currentMode = State.data.mainMode;
 
         CONSTANTS.ADDONS.forEach(addon => {
             const addonState = State.data.addons[addon.id];
             if (addonState.enabled) {
-                addon.items.forEach(item => {
+                addon.items
+                    .filter(item => !item.modes || item.modes.includes(currentMode))
+                    .forEach(item => {
                     const qty = addonState.values[item.id] || 0;
                     if (qty > 0) {
+                        const serviceKey = CONSTANTS.KEYS.services[item.keyRef];
                         const customP = State.data.customPrices[item.keyRef];
-                        const baseP = State.getPrice(CONSTANTS.KEYS.services[item.keyRef]);
-                        
-                        const price = (State.data.subMode === 'individual' && customP !== undefined) 
-                                      ? customP 
-                                      : baseP;
+                        const rawBasePrice = State.getRawPrice(serviceKey);
+                        const hasCustomPrice = State.data.subMode === 'individual' && customP !== undefined;
+                        const hasPlaceholderPrice = Helpers.isPlaceholderPrice(rawBasePrice);
+                        const minimumPrice = State.getMinimumPrice(serviceKey);
+                        const isHourly = minimumPrice > 0;
+                        const labelText = Helpers.stripHtml(item.label);
 
-                        const sum = price * qty;
-                        cost += sum;
-                        const labelText = item.label.replace(/<[^>]*>/g, '');
-                        
-                        if (qty > 1) {
-                            lines.push(`${labelText} ${Helpers.fmt(price)} ₽ x ${qty}: ${Helpers.fmt(sum)} ₽`);
+                        if (!hasCustomPrice && hasPlaceholderPrice) {
+                            if (qty > 1) {
+                                lines.push(`${labelText} x ${qty}: -`);
+                            } else {
+                                lines.push(`${labelText}: -`);
+                            }
+                            return;
+                        }
+
+                        const price = hasCustomPrice ? customP : State.getPrice(serviceKey);
+
+                        if (isHourly) {
+                            const baseSum = price * qty;
+                            const sum = Math.max(baseSum, minimumPrice);
+                            cost += sum;
+                            lines.push(`${labelText} ${Helpers.fmt(price)} ₽ x ${qty} ч.: ${Helpers.fmt(sum)} ₽`);
                         } else {
-                            lines.push(`${labelText} x ${qty}: ${Helpers.fmt(sum)} ₽`);
+                            const sum = price * qty;
+                            cost += sum;
+
+                            if (qty > 1) {
+                                lines.push(`${labelText} ${Helpers.fmt(price)} ₽ x ${qty}: ${Helpers.fmt(sum)} ₽`);
+                            } else {
+                                lines.push(`${labelText} x ${qty}: ${Helpers.fmt(sum)} ₽`);
+                            }
                         }
                     }
                 });
@@ -511,6 +568,10 @@ const UI = {
         ids.forEach(id => this.els[id] = document.getElementById(id));
     },
 
+    getVisibleAddonItems(addon, currentMode = State.data.mainMode) {
+        return addon.items.filter(item => !item.modes || item.modes.includes(currentMode));
+    },
+
     renderAddonsHTML() {
         const container = document.getElementById('addons-container');
         if (!container) return;
@@ -520,15 +581,8 @@ const UI = {
 
         container.innerHTML = `<h3 class="section-title">Сервисные услуги</h3>` + 
             CONSTANTS.ADDONS.map(addon => {
-                let itemsToRender = addon.items;
-
-                if (addon.id === 'service') {
-                    itemsToRender = addon.items.filter(item => {
-                        if (item.keyRef === 'typical_setup') return currentMode === 'typical';
-                        if (item.keyRef === 'project_setup')  return currentMode === 'project';
-                        return true;
-                    });
-                }
+                const itemsToRender = this.getVisibleAddonItems(addon, currentMode);
+                if (!itemsToRender.length) return '';
 
                 const addonState = State.data.addons[addon.id];
 
@@ -537,12 +591,15 @@ const UI = {
                         <summary class="custom-price-summary">Изменить стоимость</summary>
                         <div class="custom-price-content">
                             ${itemsToRender.map(item => {
-                                const savedPrice = State.data.customPrices[item.keyRef] || '';
-                                const defaultPrice = State.getPrice(CONSTANTS.KEYS.services[item.keyRef]);
-                                const labelText = item.label.replace(/<[^>]*>/g, '');
+                                const savedPrice = State.data.customPrices[item.keyRef] !== undefined ? State.data.customPrices[item.keyRef] : '';
+                                const serviceKey = CONSTANTS.KEYS.services[item.keyRef];
+                                const defaultPriceRaw = State.getRawPrice(serviceKey);
+                                const defaultPrice = Helpers.isPlaceholderPrice(defaultPriceRaw) ? '-' : State.getPrice(serviceKey);
+                                const minimumPrice = State.getMinimumPrice(serviceKey);
+                                const labelText = Helpers.stripHtml(item.label);
                                 return `
                                 <div class="custom-price-row">
-                                    <span>${labelText}</span>
+                                    <span>${labelText}${minimumPrice > 0 ? ` (мин. ${Helpers.fmt(minimumPrice)} ₽)` : ''}</span>
                                     <input type="number" min="0" value="${savedPrice}" placeholder="${defaultPrice}" 
                                         class="custom-price-input"
                                         onkeydown="if(['-', 'e', 'E', ',', '.'].includes(event.key)) event.preventDefault();" 
@@ -562,17 +619,38 @@ const UI = {
                             </label>
                         </div>
                         <div id="addon-items-${addon.id}" style="display:${addonState.enabled ? 'block' : 'none'}; margin-top:10px;">
-                            ${itemsToRender.map(item => `
-                                <div class="variant-row">
-                                    <span class="v-label">${item.label}</span>
+                            ${itemsToRender.map(item => {
+                                const serviceKey = CONSTANTS.KEYS.services[item.keyRef];
+                                const minimumPrice = State.getMinimumPrice(serviceKey);
+                                const hasPlaceholderPrice = Helpers.isPlaceholderPrice(State.getRawPrice(serviceKey));
+                                const hourlyPrice = State.data.subMode === 'individual' && State.data.customPrices[item.keyRef] !== undefined
+                                    ? State.data.customPrices[item.keyRef]
+                                    : State.getPrice(serviceKey);
+                                const minimumHours = minimumPrice > 0 && hourlyPrice > 0
+                                    ? Math.ceil(minimumPrice / hourlyPrice)
+                                    : 0;
+                                const unitLabel = minimumPrice > 0 ? 'ч.' : 'шт.';
+                                const metaText = minimumPrice > 0
+                                    ? `Почасовая работа, ${Helpers.fmt(hourlyPrice)} ₽/ч, минимум ${minimumHours} ч.`
+                                    : hasPlaceholderPrice
+                                        ? 'Цена пока не указана'
+                                        : '';
+
+                                return `
+                                <div class="variant-row ${minimumPrice > 0 ? 'variant-row-hourly' : ''} ${hasPlaceholderPrice ? 'variant-row-placeholder' : ''}">
+                                    <div class="variant-text">
+                                        <span class="v-label">${item.label}</span>
+                                        ${metaText ? `<span class="variant-meta">${metaText}</span>` : ''}
+                                    </div>
                                     <div class="v-controls">
                                         <input type="number" class="qty-input" min="0" 
                                             value="${addonState.values[item.id] || ''}"
                                             placeholder="0" 
                                             data-action="update-addon" data-addon="${addon.id}" data-item="${item.id}">
-                                        <span class="unit-text">шт.</span>
+                                        <span class="unit-text">${unitLabel}</span>
                                     </div>
-                                </div>`).join('')}
+                                </div>`;
+                            }).join('')}
                             ${customPriceBlock}
                         </div>
                     </div>`;
