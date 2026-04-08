@@ -1124,7 +1124,7 @@ window.downloadKP = async () => {
     const partnerEmail = document.getElementById('partner-email')?.value.trim() || '';
 
     const isTypical = State.data.mainMode === 'typical';
-    const prefix    = isTypical ? 'pdf-base' : 'pdf-project';
+    const prefix    = isTypical ? 'epd-pdf-base' : 'epd-pdf-project';
 
     async function toBase64(url) {
         try {
