@@ -60,7 +60,8 @@ const CONSTANTS = {
             id: 'goslog', title: 'Регистрация на платформе «ГосЛог»',
             items: [
                 { id: 'gw1', label: 'Регистрация на платформе «ГосЛог» для OC Windows', keyRef: 'goslog_win' },
-                { id: 'gm1', label: 'Регистрация на платформе «ГосЛог» для OC MacOS', keyRef: 'goslog_mac' }
+                { id: 'gm1', label: 'Регистрация на платформе «ГосЛог» для OC MacOS', keyRef: 'goslog_mac' },
+                { id: 'epd_goslog_support', label: 'Настройка рабочего места и техническая поддержка по регистрации на платформе ГосЛог (для экспедиторов)', keyRef: 'epd_goslog_support' }
             ]
         },
         {
@@ -82,7 +83,6 @@ const CONSTANTS = {
                 { id: 'epd_training_tr', label: 'Обучение и консультация по запуску работы в 1С-ЭПД (ТР)', keyRef: 'epd_training_tr', modes: ['typical'] },
                 { id: 'epd_training_pr', label: 'Обучение и консультация по запуску работы в 1С-ЭПД (ПР)', keyRef: 'epd_training_pr', modes: ['project'] },
                 { id: 'epd_transition_survey', label: 'Предпроектное обследование по переходу на ЭПД', keyRef: 'epd_transition_survey', modes: ['project'] },
-                { id: 'epd_goslog_support', label: 'Настройка рабочего места и техническая поддержка по регистрации на платформе ГосЛог (для экспедиторов)', keyRef: 'epd_goslog_support' },
                 { id: 'epd_config_update', label: 'Доработка конфигурации 1С для работы с ЭПД', keyRef: 'epd_config_update', modes: ['project'] }
             ]
         }
@@ -101,6 +101,9 @@ const State = {
         customDocsCount: null,
         pricing: [],
         customPrices: {},
+        extraServicesEnabled: false,
+        extraServices: [],
+        extraServiceSeq: 1,
         ukepQty: 0,
         ukepPeriod: 12,
         sigType: null,
@@ -121,10 +124,23 @@ const State = {
         });
     },
 
+    createExtraService() {
+        const id = `extra-service-${this.data.extraServiceSeq++}`;
+        return { id, name: '', qty: '', price: '' };
+    },
+
+    initExtraServices() {
+        if (!this.data.extraServices.length) {
+            this.data.extraServices = [this.createExtraService()];
+        }
+    },
+
     resetCalculation() {
         this.data.docsYearly = 0;
         this.data.customDocsCount = null;
         this.data.customPrices = {};
+        this.data.extraServicesEnabled = false;
+        this.data.extraServices = [this.createExtraService()];
         
         this.data.ukepQty = 0;
         this.data.ukepPeriod = 12;
@@ -222,6 +238,13 @@ const Helpers = {
         let cleaned = val.toString().replace(/\u00A0/g, '').replace(/\s/g, '').replace(',', '.');
         return parseFloat(cleaned) || 0;
     },
+    digitsOnly: (val) => (val || '').toString().replace(/\D/g, ''),
+    escapeHtml: (text) => (text || '').toString()
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;'),
     stripHtml: (text) => (text || '').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim(),
     isPlaceholderPrice: (val) => typeof val === 'string' && val.trim() === '-',
     fmt: (num) => Math.round(num).toLocaleString('ru-RU'),
@@ -344,6 +367,10 @@ const Calculator = {
         const addonRes = this.calcAddons();
         total += addonRes.cost;
         lines.push(...addonRes.lines);
+
+        const extraServicesRes = this.calcExtraServices();
+        total += extraServicesRes.cost;
+        lines.push(...extraServicesRes.lines);
 
         return { total, lines, tariffMeta: tariffRes.meta, tariffPackages: (tariffRes.meta && tariffRes.meta.packages) ? tariffRes.meta.packages : null };
     },
@@ -547,6 +574,26 @@ const Calculator = {
             }
         });
         return { cost, lines };
+    },
+
+    calcExtraServices() {
+        if (!State.data.extraServicesEnabled) return { cost: 0, lines: [] };
+
+        let cost = 0;
+        let lines = [];
+
+        State.data.extraServices.forEach(item => {
+            const qty = parseInt(item.qty, 10) || 0;
+            const price = parseInt(item.price, 10) || 0;
+            if (qty <= 0 || price <= 0) return;
+
+            const serviceName = item.name.trim() || 'Прочая услуга';
+            const sum = qty * price;
+            cost += sum;
+            lines.push(`${serviceName} ${Helpers.fmt(price)} ₽ x ${qty}: ${Helpers.fmt(sum)} ₽`);
+        });
+
+        return { cost, lines };
     }
 };
 
@@ -558,13 +605,15 @@ const UI = {
 
     init() {
         this.renderAddonsHTML();
+        this.renderExtraServices();
         this.cacheElements();
         this.bindEvents();
     },
 
     cacheElements() {
         const ids = ['dynamic-content', 'total-price', 'details-content', 'docs-month', 'docs-year', 
-                     'card-basis', 'card-kcr', 'check-basis', 'check-kcr', 'ukep-qty'];
+                     'card-basis', 'card-kcr', 'check-basis', 'check-kcr', 'ukep-qty', 'extra-services-list',
+                     'extra-services-content', 'check-extra-services', 'extra-services-card'];
         ids.forEach(id => this.els[id] = document.getElementById(id));
     },
 
@@ -657,11 +706,60 @@ const UI = {
             }).join('');
     },
 
+    renderExtraServices() {
+        const container = this.els['extra-services-list'] || document.getElementById('extra-services-list');
+        if (!container) return;
+        const content = this.els['extra-services-content'] || document.getElementById('extra-services-content');
+        const checkbox = this.els['check-extra-services'] || document.getElementById('check-extra-services');
+        const card = this.els['extra-services-card'] || document.getElementById('extra-services-card');
+
+        if (checkbox) checkbox.checked = State.data.extraServicesEnabled;
+        if (content) content.style.display = State.data.extraServicesEnabled ? 'block' : 'none';
+        if (card) card.classList.toggle('active', State.data.extraServicesEnabled);
+
+        if (!State.data.extraServicesEnabled) {
+            container.innerHTML = '';
+            return;
+        }
+
+        if (!State.data.extraServices.length) {
+            container.innerHTML = `<div class="extra-services-empty">Добавьте строку, чтобы включить прочие услуги в расчёт.</div>`;
+            return;
+        }
+
+        container.innerHTML = `
+            <div class="extra-service-grid extra-service-grid-head">
+                <span>Наименование</span>
+                <span>Количество</span>
+                <span>Цена</span>
+                <span></span>
+            </div>
+            <div class="extra-service-list">
+                ${State.data.extraServices.map(item => `
+                    <div class="extra-service-grid extra-service-row" data-row-id="${item.id}">
+                        <input type="text" class="extra-service-input extra-service-name" placeholder="Наименование услуги"
+                            value="${Helpers.escapeHtml(item.name)}"
+                            data-action="extra-service-name" data-id="${item.id}">
+                        <input type="text" class="extra-service-input extra-service-number" placeholder="0"
+                            inputmode="numeric" autocomplete="off" data-digits-only="true"
+                            value="${item.qty}"
+                            data-action="extra-service-qty" data-id="${item.id}">
+                        <input type="text" class="extra-service-input extra-service-number" placeholder="0"
+                            inputmode="numeric" autocomplete="off" data-digits-only="true"
+                            value="${item.price}"
+                            data-action="extra-service-price" data-id="${item.id}">
+                        <button type="button" class="extra-service-remove-btn" data-click="remove-extra-service" data-id="${item.id}">Удалить</button>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    },
+
     update() {
         const result = Calculator.calculateAll();
         
         this.els['total-price'].textContent = Helpers.fmt(result.total) + ' ₽';
-        this.els['details-content'].innerHTML = result.lines.join('<br>');
+        this.els['details-content'].innerHTML = result.lines.map(line => Helpers.escapeHtml(line)).join('<br>');
         this.renderTariffCard(result.tariffMeta);
         this.updateSignaturesUI();
     },
@@ -921,6 +1019,16 @@ const UI = {
         document.body.addEventListener('input', (e) => this.handleInput(e));
         document.body.addEventListener('change', (e) => this.handleChange(e));
         document.body.addEventListener('click', (e) => this.handleClick(e));
+        document.body.addEventListener('keydown', (e) => {
+            const t = e.target;
+            if (!t || t.dataset.digitsOnly !== 'true') return;
+            if (e.ctrlKey || e.metaKey) return;
+
+            const allowedKeys = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Home', 'End'];
+            if (!/^\d$/.test(e.key) && !allowedKeys.includes(e.key)) {
+                e.preventDefault();
+            }
+        });
 
         document.body.addEventListener('focus', (e) => {
             const t = e.target;
@@ -969,6 +1077,21 @@ const UI = {
         else if (act === 'update-addon') {
             const { addon, item } = t.dataset;
             State.data.addons[addon].values[item] = Math.max(0, parseInt(val)||0);
+            this.update();
+        }
+        else if (act === 'extra-service-name') {
+            const row = State.data.extraServices.find(item => item.id === t.dataset.id);
+            if (!row) return;
+            row.name = val;
+            this.update();
+        }
+        else if (act === 'extra-service-qty' || act === 'extra-service-price') {
+            const row = State.data.extraServices.find(item => item.id === t.dataset.id);
+            if (!row) return;
+
+            const digits = Helpers.digitsOnly(val);
+            t.value = digits;
+            row[act === 'extra-service-qty' ? 'qty' : 'price'] = digits;
             this.update();
         }
     },
@@ -1034,6 +1157,11 @@ const UI = {
             document.getElementById(`addon-card-${id}`).classList.toggle('active', t.checked);
             this.update();
         }
+        else if (act === 'toggle-extra-services') {
+            State.data.extraServicesEnabled = t.checked;
+            this.renderExtraServices();
+            this.update();
+        }
     },
 
     handleClick(e) {
@@ -1052,6 +1180,7 @@ const UI = {
             State.resetCalculation();
             
             this.renderAddonsHTML();
+            this.renderExtraServices();
             this.update();
         }
         else if (act === 'set-submode') {
@@ -1073,6 +1202,17 @@ const UI = {
             State.data.ukepPeriod = parseInt(t.dataset.val);
             this.update();
         }
+        else if (act === 'add-extra-service') {
+            State.data.extraServices.push(State.createExtraService());
+            this.renderExtraServices();
+            this.update();
+        }
+        else if (act === 'remove-extra-service') {
+            const id = t.dataset.id;
+            State.data.extraServices = State.data.extraServices.filter(item => item.id !== id);
+            this.renderExtraServices();
+            this.update();
+        }
     }
 };
 
@@ -1081,6 +1221,7 @@ const UI = {
  */
 document.addEventListener('DOMContentLoaded', async () => {
     State.initAddons();
+    State.initExtraServices();
     UI.init();
 
     const contactFields = ['partner-name', 'partner-phone', 'partner-email', 'client-name'];
@@ -1165,7 +1306,7 @@ window.downloadKP = async () => {
                     if (found && found.unitPrice) unitPriceFmt = Helpers.fmt(found.unitPrice);
                 }
                 return {
-                    title: `${pkgName}${unitPriceFmt ? ' (' + unitPriceFmt + ' ₽)' : ''} × ${qty}`,
+                    title: `${pkgName}${unitPriceFmt ? ' ' + unitPriceFmt + ' ₽' : ''} × ${qty}`,
                     price: totalPriceStr
                 };
             }
@@ -1533,7 +1674,7 @@ window.updateServicePrice = (keyRef, value) => {
     
     const result = Calculator.calculateAll();
     document.getElementById('total-price').textContent = Helpers.fmt(result.total) + ' ₽';
-    document.getElementById('details-content').innerHTML = result.lines.join('<br>');
+    document.getElementById('details-content').innerHTML = result.lines.map(line => Helpers.escapeHtml(line)).join('<br>');
 };
 
 window.updateCustomPrice = (key, value) => {
@@ -1546,5 +1687,5 @@ window.updateCustomPrice = (key, value) => {
     
     const result = Calculator.calculateAll();
     document.getElementById('total-price').textContent = Helpers.fmt(result.total) + ' ₽';
-    document.getElementById('details-content').innerHTML = result.lines.join('<br>');
+    document.getElementById('details-content').innerHTML = result.lines.map(line => Helpers.escapeHtml(line)).join('<br>');
 };
