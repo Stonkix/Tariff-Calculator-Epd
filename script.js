@@ -40,15 +40,21 @@ const CONSTANTS = {
             epd_training_tr: "Обучение и консультация по запуску работы в 1С-ЭПД (ТР)",
             epd_training_pr: "Обучение и консультация по запуску работы в 1С-ЭПД (ПР)",
             epd_transition_survey: "Предпроектное обследование по переходу на ЭПД",
-            epd_goslog_support: "Настройка рабочего места и техническая поддержка по регистрации на платформе ГосЛог (для экспедиторов)",
-            epd_config_update: "Доработка конфигурации 1С для работы с ЭПД"
+            epd_config_update: "Доработка конфигурации 1С для работы с ЭПД",
+            install_local: "Установка 1С на локальный компьютер",
+            install_server: "Установка 1С на сервер",
+            install_thin: "Установка 1С на тонкий клиент 1С на локальный компьютер",
+            update_configs: "Обновление типовых конфигураций",
+            migrate_fresh: "Перенос базы 1С из локальной 1С во Фреш",
+            migrate_pc: "Перенос базы 1С на другой компьютер",
+            install_thin_client: "Установка тонкого клиента"
         }
     },
     LIMITS: [600, 1000, 5000, 10000, 50000, 100000],
 
     ADDONS: [
         {
-            id: 'setup', title: 'Удалённая настройка рабочего места',
+            id: 'setup', title: 'Удалённая настройка рабочего места для работы с ЭП',
             items: [
                 { id: 'sw1', label: 'Windows (nalog.ru <b>или</b> ЕСИА)', keyRef: 'setup_win_1' },
                 { id: 'sw2', label: 'Windows (nalog.ru <b>и</b> ЕСИА)', keyRef: 'setup_win_2' },
@@ -60,17 +66,19 @@ const CONSTANTS = {
             id: 'goslog', title: 'Регистрация на платформе «ГосЛог»',
             items: [
                 { id: 'gw1', label: 'Регистрация на платформе «ГосЛог» для OC Windows', keyRef: 'goslog_win' },
-                { id: 'gm1', label: 'Регистрация на платформе «ГосЛог» для OC MacOS', keyRef: 'goslog_mac' },
-                { id: 'epd_goslog_support', label: 'Настройка рабочего места и техническая поддержка по регистрации на платформе ГосЛог (для экспедиторов)', keyRef: 'epd_goslog_support' }
+                { id: 'gm1', label: 'Регистрация на платформе «ГосЛог» для OC MacOS', keyRef: 'goslog_mac' }
             ]
         },
         {
             id: 'service', title: 'Внедрение и обучение',
             items: [
-                { id: 'setup_typical', label: 'Типовая настройка', keyRef: 'typical_setup', modes: ['typical'] },
-                { id: 'setup_project',  label: 'Проектная установка', keyRef: 'project_setup', modes: ['project'] },
-                { id: 't1', label: 'Обучение (1 группа до 5 человек/час)', keyRef: 'training' },
-                { id: 'ps1', label: 'Проектное обследование (1 час)', keyRef: 'project_survey' }
+                { id: 'install_local', label: 'Установка 1С на локальный компьютер', keyRef: 'install_local', modes: ['typical'] },
+                { id: 'install_server', label: 'Установка 1С на сервер', keyRef: 'install_server', modes: ['typical'] },
+                { id: 'install_thin', label: 'Установка 1С на тонкий клиент на локальный компьютер', keyRef: 'install_thin', modes: ['typical'] },
+                { id: 'epd_training_tr', label: 'Обучение и консультация по запуску работы в 1С-ЭПД (ТР)', keyRef: 'epd_training_tr', modes: ['typical'] },
+                { id: 'setup_project', label: 'Проектная установка', keyRef: 'project_setup', modes: ['project'] },
+                { id: 'ps1', label: 'Проектное обследование (1 час)', keyRef: 'project_survey', modes: ['project'] },
+                { id: 'epd_training_pr', label: 'Обучение и консультация по запуску работы в 1С-ЭПД (ПР)', keyRef: 'epd_training_pr', modes: ['project'] }
             ]
         },
         {
@@ -80,10 +88,17 @@ const CONSTANTS = {
                 { id: 'epd_start_tr_next', label: 'Старт работы с ЭПД на 2-м и последующих рабочих местах (ТР)', keyRef: 'epd_start_tr_next', modes: ['typical'] },
                 { id: 'epd_start_pr_first', label: 'Старт работы с ЭПД на 1-м рабочем месте (ПР)', keyRef: 'epd_start_pr_first', modes: ['project'] },
                 { id: 'epd_start_pr_next', label: 'Старт работы с ЭПД на 2-м и последующих рабочих местах (ПР)', keyRef: 'epd_start_pr_next', modes: ['project'] },
-                { id: 'epd_training_tr', label: 'Обучение и консультация по запуску работы в 1С-ЭПД (ТР)', keyRef: 'epd_training_tr', modes: ['typical'] },
-                { id: 'epd_training_pr', label: 'Обучение и консультация по запуску работы в 1С-ЭПД (ПР)', keyRef: 'epd_training_pr', modes: ['project'] },
                 { id: 'epd_transition_survey', label: 'Предпроектное обследование по переходу на ЭПД', keyRef: 'epd_transition_survey', modes: ['project'] },
                 { id: 'epd_config_update', label: 'Доработка конфигурации 1С для работы с ЭПД', keyRef: 'epd_config_update', modes: ['project'] }
+            ]
+        },
+        {
+            id: 'extra_1c', title: 'Дополнительные услуги',
+            items: [
+                { id: 'update_configs', label: 'Обновление типовых конфигураций', keyRef: 'update_configs', tiered: true },
+                { id: 'migrate_fresh', label: 'Перенос базы 1С из локальной 1С во Фреш', keyRef: 'migrate_fresh' },
+                { id: 'migrate_pc', label: 'Перенос базы 1С на другой компьютер', keyRef: 'migrate_pc' },
+                { id: 'install_thin_client', label: 'Установка тонкого клиента', keyRef: 'install_thin_client' }
             ]
         }
     ],
@@ -226,6 +241,11 @@ const State = {
     getMinimumPrice(key) {
         if (!this.data.pricing[2] || !key) return 0;
         return Helpers.parseNum(this.data.pricing[2][key]);
+    },
+
+    getNextPrice(key) {
+        if (!this.data.pricing[3] || !key) return 0;
+        return Helpers.parseNum(this.data.pricing[3][key]);
     }
 };
 
@@ -559,6 +579,21 @@ const Calculator = {
                             const sum = Math.max(baseSum, minimumPrice);
                             cost += sum;
                             lines.push(`${labelText} ${Helpers.fmt(price)} ₽ x ${qty} ч.: ${Helpers.fmt(sum)} ₽`);
+                        } else if (item.tiered) {
+                            const serviceKey2 = CONSTANTS.KEYS.services[item.keyRef];
+                            const nextPrice = State.getNextPrice(serviceKey2);
+                            let sum;
+                            if (qty <= 1) {
+                                sum = price;
+                            } else {
+                                sum = price + (qty - 1) * nextPrice;
+                            }
+                            cost += sum;
+                            if (qty <= 1) {
+                                lines.push(`${labelText}: ${Helpers.fmt(sum)} ₽`);
+                            } else {
+                                lines.push(`${labelText} (1 ч. × ${Helpers.fmt(price)} ₽ + ${qty-1} ч. × ${Helpers.fmt(nextPrice)} ₽): ${Helpers.fmt(sum)} ₽`);
+                            }
                         } else {
                             const sum = price * qty;
                             cost += sum;
@@ -678,12 +713,19 @@ const UI = {
                                 const minimumHours = minimumPrice > 0 && hourlyPrice > 0
                                     ? Math.ceil(minimumPrice / hourlyPrice)
                                     : 0;
-                                const unitLabel = minimumPrice > 0 ? 'ч.' : 'шт.';
+                                const isTiered = !!item.tiered;
+                                const unitLabel = minimumPrice > 0 ? 'ч.' : isTiered ? 'ч.' : 'шт.';
                                 const metaText = minimumPrice > 0
                                     ? `Почасовая работа, ${Helpers.fmt(hourlyPrice)} ₽/ч, минимум ${minimumHours} ч.`
-                                    : hasPlaceholderPrice
-                                        ? 'Цена пока не указана'
-                                        : '';
+                                    : isTiered
+                                        ? (() => {
+                                            const sk = CONSTANTS.KEYS.services[item.keyRef];
+                                            const np = State.getNextPrice(sk);
+                                            return `1-й час — ${Helpers.fmt(State.getPrice(sk))} ₽, каждый последующий — ${Helpers.fmt(np)} ₽`;
+                                          })()
+                                        : hasPlaceholderPrice
+                                            ? 'Цена пока не указана'
+                                            : '';
 
                                 return `
                                 <div class="variant-row ${minimumPrice > 0 ? 'variant-row-hourly' : ''} ${hasPlaceholderPrice ? 'variant-row-placeholder' : ''}">
@@ -1246,6 +1288,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         } catch(e) {
             State.data.pricing = JSON.parse("[" + text.replace(/}\s*{/g, "},{") + "]");
         }
+        UI.renderAddonsHTML();
         UI.update(); 
     } catch (e) { 
         console.error("Ошибка загрузки цен", e); 
