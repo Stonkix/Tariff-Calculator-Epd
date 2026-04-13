@@ -402,6 +402,7 @@ const Calculator = {
             const limits = CONSTANTS.LIMITS;
             let idx = limits.findIndex(l => l >= State.data.docsYearly);
             const finalIdx = idx === -1 ? limits.length - 1 : idx;
+            const isAboveMaxLimit = idx === -1;
             
             const key = CONSTANTS.KEYS.tariffs[finalIdx];
             const limitVal = limits[finalIdx];
@@ -410,13 +411,16 @@ const Calculator = {
             const customUnit = State.data.customPrices['unit'];
             const currentUnit = customUnit !== undefined ? customUnit : stdUnit;
 
-            const effectiveDocs = State.data.customDocsCount !== null ? State.data.customDocsCount : limitVal;
+            const defaultDocsCount = isAboveMaxLimit ? State.data.docsYearly : limitVal;
+            const effectiveDocs = State.data.customDocsCount !== null ? State.data.customDocsCount : defaultDocsCount;
             const cost = effectiveDocs * currentUnit;
 
-            const displayDocs = State.data.customDocsCount !== null ? State.data.customDocsCount : limitVal;
+            const displayDocs = State.data.customDocsCount !== null ? State.data.customDocsCount : defaultDocsCount;
             const displayKey = State.data.customDocsCount !== null
                 ? `1С-ЭПД ${Helpers.fmt(displayDocs)} документов`
-                : key.replace(/\n/g, ' ');
+                : isAboveMaxLimit
+                    ? `1С-ЭПД ${Helpers.fmt(displayDocs)} документов`
+                    : key.replace(/\n/g, ' ');
 
             const line = `Тариф: ${displayKey} | ${Helpers.fmt(cost)} ₽`;
 
