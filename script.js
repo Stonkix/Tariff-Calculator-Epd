@@ -1339,7 +1339,7 @@ window.downloadKP = async () => {
         if (m) {
             const nameAndQty = m[1].trim();
             const totalPriceStr = m[2].trim() + ' ₽';
-            const crossIdx = nameAndQty.lastIndexOf('×');
+            const crossIdx = Math.max(nameAndQty.lastIndexOf('×'), nameAndQty.lastIndexOf('x'));
             if (crossIdx !== -1) {
                 const pkgName = nameAndQty.slice(0, crossIdx).trim();
                 const qty = nameAndQty.slice(crossIdx + 1).trim();
@@ -1358,11 +1358,20 @@ window.downloadKP = async () => {
         return null;
     }
 
-    const PRICE_RE = /(\d[\d\s]*[\d])\s*[РрPp₽руб\.]+\s*$/i;
+    const PRICE_RE = /(\d(?:[\d\s]*\d)?)\s*[РрPp₽руб\.]+\s*$/i;
 
     function parseLine(line) {
         const tariffParsed = parseTariffPackageLine(line, result.tariffPackages);
         if (tariffParsed) return tariffParsed;
+
+        const detailedLine = line.match(/^(.+?)\s+(\d(?:[\d\s]*\d)?)\s*₽\s*[x×]\s*(\d+)(?:\s*(ч\.))?\s*:\s*(\d(?:[\d\s]*\d)?)\s*₽$/i);
+        if (detailedLine) {
+            const [, title, unitPrice, qty, unit, totalPrice] = detailedLine;
+            return {
+                title: `${title.trim()} ${unitPrice.trim()} ₽ × ${qty}${unit ? ` ${unit}` : ''}`,
+                price: `${totalPrice.trim()} ₽`
+            };
+        }
 
         if (line.includes('|')) {
             const parts = line.split('|');
@@ -1373,7 +1382,7 @@ window.downloadKP = async () => {
             const after = line.slice(colonIdx + 1).trim();
             if (PRICE_RE.test(after)) return { title: line.slice(0, colonIdx).trim(), price: after };
         }
-        const m = line.match(/^(.+?)\s{2,}(\d[\d\s]*[\d]\s*[РрPp₽руб\.]+)\s*$/i);
+        const m = line.match(/^(.+?)\s{2,}(\d(?:[\d\s]*\d)?\s*[РрPp₽руб\.]+)\s*$/i);
         if (m) return { title: m[1].trim(), price: m[2].trim() };
         return { title: line, price: null };
     }
@@ -1381,28 +1390,32 @@ window.downloadKP = async () => {
     function buildRows(arr) {
         return arr.map(line => {
             const { title, price } = parseLine(line);
+            const safeTitle = Helpers.escapeHtml(title);
+            const safePrice = price ? Helpers.escapeHtml(price) : null;
             if (price) {
                 return `<tr>
-                    <td style="padding:6px 8px 6px 0;font-size:9.5pt;color:#1a1a2e;border-bottom:1px solid #ede8ff;word-break:break-word;max-width:360px;line-height:1.4;">${title}</td>
-                    <td style="padding:6px 0 6px 8px;text-align:right;font-weight:700;color:#7c3aed;font-size:9.5pt;white-space:nowrap;border-bottom:1px solid #ede8ff;vertical-align:top;">${price}</td>
+                    <td style="padding:6px 8px 6px 0;font-size:9.5pt;color:#1a1a2e;border-bottom:1px solid #ede8ff;word-break:break-word;max-width:360px;line-height:1.4;">${safeTitle}</td>
+                    <td style="padding:6px 0 6px 8px;text-align:right;font-weight:700;color:#7c3aed;font-size:9.5pt;white-space:nowrap;border-bottom:1px solid #ede8ff;vertical-align:top;">${safePrice}</td>
                 </tr>`;
             }
             return `<tr>
-                <td colspan="2" style="padding:6px 0;font-size:9.5pt;color:#1a1a2e;border-bottom:1px solid #ede8ff;word-break:break-word;line-height:1.4;">${title}</td>
+                <td colspan="2" style="padding:6px 0;font-size:9.5pt;color:#1a1a2e;border-bottom:1px solid #ede8ff;word-break:break-word;line-height:1.4;">${safeTitle}</td>
             </tr>`;
         }).join('');
     }
 
     function buildSingleRow(line) {
         const { title, price } = parseLine(line);
+        const safeTitle = Helpers.escapeHtml(title);
+        const safePrice = price ? Helpers.escapeHtml(price) : null;
         if (price) {
             return `<tr>
-                <td style="padding:6px 8px 6px 0;font-size:9.5pt;color:#1a1a2e;border-bottom:1px solid #ede8ff;word-break:break-word;max-width:360px;line-height:1.4;">${title}</td>
-                <td style="padding:6px 0 6px 8px;text-align:right;font-weight:700;color:#7c3aed;font-size:9.5pt;white-space:nowrap;border-bottom:1px solid #ede8ff;vertical-align:top;">${price}</td>
+                <td style="padding:6px 8px 6px 0;font-size:9.5pt;color:#1a1a2e;border-bottom:1px solid #ede8ff;word-break:break-word;max-width:360px;line-height:1.4;">${safeTitle}</td>
+                <td style="padding:6px 0 6px 8px;text-align:right;font-weight:700;color:#7c3aed;font-size:9.5pt;white-space:nowrap;border-bottom:1px solid #ede8ff;vertical-align:top;">${safePrice}</td>
             </tr>`;
         }
         return `<tr>
-            <td colspan="2" style="padding:6px 0;font-size:9.5pt;color:#1a1a2e;border-bottom:1px solid #ede8ff;word-break:break-word;line-height:1.4;">${title}</td>
+            <td colspan="2" style="padding:6px 0;font-size:9.5pt;color:#1a1a2e;border-bottom:1px solid #ede8ff;word-break:break-word;line-height:1.4;">${safeTitle}</td>
         </tr>`;
     }
 
