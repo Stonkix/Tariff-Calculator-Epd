@@ -1265,6 +1265,108 @@ const UI = {
 /**
  * 6. ИНИЦИАЛИЗАЦИЯ
  */
+window._customValidityDate = null;
+
+window._openCustomDatePicker = () => {
+    const picker = document.getElementById("kp-validity-date-picker");
+    if (!picker) return;
+    const today = new Date();
+    picker.min = today.toISOString().split("T")[0];
+    picker.value = ""; 
+    
+    picker.style.pointerEvents = "auto";
+    try {
+        picker.showPicker ? picker.showPicker() : picker.click();
+    } catch(e) {
+        picker.click();
+    }
+    picker.style.pointerEvents = "none";
+};
+
+window.toggleValidityDropdown = () => {
+    const dd = document.getElementById("kp-validity-dropdown");
+    const display = document.getElementById("kp-validity-display");
+    if (!dd) return;
+    const isOpen = dd.style.display !== "none";
+    dd.style.display = isOpen ? "none" : "block";
+    if (display) display.style.borderColor = isOpen ? "#eee" : "#7C39BF";
+};
+
+window.closeValidityDropdown = () => {
+    const dd = document.getElementById("kp-validity-dropdown");
+    const display = document.getElementById("kp-validity-display");
+    if (dd) dd.style.display = "none";
+    if (display) display.style.borderColor = "#eee";
+};
+
+window.handleValidityChange = (value) => {
+    localStorage.setItem("epd-kp-validity", value);
+    window.closeValidityDropdown();
+    
+    if (value === "custom") {
+        window._openCustomDatePicker();
+    } else {
+        window._customValidityDate = null;
+        window.updateValidityDisplay();
+    }
+};
+
+window.handleCustomDatePick = (isoValue) => {
+    if (!isoValue) return;
+    window._customValidityDate = isoValue;
+    window.updateValidityDisplay();
+};
+
+window.getValidityDate = () => {
+    const saved = localStorage.getItem("epd-kp-validity") || "30";
+    if (saved === "custom") {
+        if (window._customValidityDate) {
+            const parts = window._customValidityDate.split("-");
+            return `${parts[2]}.${parts[1]}.${parts[0]}`;
+        }
+        return "";
+    }
+    const days = parseInt(saved) || 30;
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    return d.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" });
+};
+
+window.updateValidityDisplay = () => {
+    const display = document.getElementById("kp-validity-display");
+    if (!display) return;
+    const saved = localStorage.getItem("epd-kp-validity") || "30";
+    if (saved === "custom" && window._customValidityDate) {
+        const parts = window._customValidityDate.split("-");
+        display.textContent = `До ${parts[2]}.${parts[1]}.${parts[0]}`;
+        display.style.color = "#7C39BF";
+    } else if (saved !== "custom") {
+        const days = parseInt(saved) || 30;
+        const d = new Date();
+        d.setDate(d.getDate() + days);
+        const dateStr = d.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" });
+        display.textContent = `До ${dateStr}`;
+        display.style.color = "#7C39BF";
+    } else {
+        display.textContent = "30 дней";
+        display.style.color = "";
+    }
+};
+
+// Алиас для совместимости с downloadKP
+window.updateValidityDate = window.updateValidityDisplay;
+
+// Закрывать дропдаун при клике вне
+document.addEventListener('click', (e) => {
+    const display = document.getElementById('kp-validity-display');
+    const dd = document.getElementById('kp-validity-dropdown');
+    if (!display || !dd) return;
+    if (!display.contains(e.target) && !dd.contains(e.target)) {
+        window.closeValidityDropdown();
+    }
+});
+
+
 document.addEventListener('DOMContentLoaded', async () => {
     State.initAddons();
     State.initExtraServices();
@@ -1283,6 +1385,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }
     });
+
+    localStorage.setItem('epd-kp-validity', '30'); 
+
+    window._customValidityDate = null;
+    localStorage.removeItem('epd-kp-custom-date'); 
+
+    window.updateValidityDisplay();
 
     try {
         const res = await fetch('Цены для калькулятора ЭПД.json');
@@ -1423,10 +1532,12 @@ window.downloadKP = async () => {
         </tr>`;
     }
 
+    const validityDate = window.getValidityDate ? window.getValidityDate() : "";
     const summaryBlock = `
         <div style="background:#f3f0ff;border-radius:10px;padding:16px 28px;margin-top:14px;text-align:center;">
-            <div style="font-size:9.5pt;color:#6d28d9;margin-bottom:6px;">Стоимость для ${clientName}:</div>
+            <div style="font-size:9.5pt;color:#6d28d9;margin-bottom:4px;">Стоимость для ${clientName}:</div>
             <div style="font-size:20pt;font-weight:800;color:#7c3aed;letter-spacing:-0.5px;">${Helpers.fmt(result.total)} ₽</div>
+            ${validityDate ? `<div style="font-size:8pt;color:#888;margin-top:8px;">Предложение действительно до ${validityDate}</div>` : ""}
         </div>`;
 
     const contactBlock = `
