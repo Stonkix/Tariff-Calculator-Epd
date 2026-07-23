@@ -1861,3 +1861,4 @@ window.updateCustomPrice = (key, value) => {
     document.getElementById('total-price').textContent = Helpers.fmt(result.total) + ' ₽';
     document.getElementById('details-content').innerHTML = result.lines.map(line => Helpers.escapeHtml(line)).join('<br>');
 };
+
