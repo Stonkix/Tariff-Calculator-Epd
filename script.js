@@ -1494,6 +1494,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 window.downloadKP = async () => {
+    if (State.data.mainMode === 'docs') {
+        alert('В разработке');
+        return;
+    }
+
     const result = Calculator.calculateAll();
     if (result.total === 0) {
         alert('Сначала сделайте расчет!');
