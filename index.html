@@ -3,25 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Помощник подбора тарифов 1С-ЭПД</title>
+    <title>Помощник подбора тарифов ЭПД</title>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <header class="page-title">
-        <h1>Помощник подбора тарифов 1С-ЭПД</h1>
+        <h1>Помощник подбора тарифов ЭПД</h1>
         <p>Рассчитайте стоимость подключения за несколько кликов</p>
     </header>
 
     <div class="calculator">
         <div class="form-row">
-            <label>Выберите тип решения:</label>
+            <label>Выберите вашу систему учета:</label>
             <div class="toggle-group" id="main-mode-toggle">
-                <button class="toggle-btn selected" data-click="set-mode" data-val="typical">1С-ЭПД:Типовое решение</button>
-                <button class="toggle-btn" data-click="set-mode" data-val="project">1С-ЭПД:Проектное решение</button>
+                <button class="toggle-btn selected" data-click="set-mode" data-val="one-c">1С версии 8.3 и выше</button>
+                <button class="toggle-btn" data-click="set-mode" data-val="docs">Нет 1С или версия ниже 8.3</button>
             </div>
         </div>
 
+        <div id="one-c-calculator">
+        <div id="solution-recommendation" class="form-row" aria-live="polite">
+            <label>Вам подходит решение:</label>
+            <div class="solution-badge"><strong>1С-ЭПД</strong></div>
+        </div>
         <div class="form-row">
             <label>Вариант расчета:</label>
             <div class="toggle-group" id="sub-mode-toggle">
@@ -166,6 +171,8 @@
 
         <div id="addons-container"></div>
 
+        <div id="doki-services-container"></div>
+
         <div class="extra-services-section" id="extra-services-card">
             <div class="extra-services-header">
                 <div>
@@ -187,6 +194,7 @@
             <div id="details-content" style="font-size: 14px; white-space: pre-line; color: #444; line-height: 1.6;">
                 Введите данные для расчета...
             </div>
+        </div>
         </div>
 
         <!-- Блок контактных данных -->
@@ -258,7 +266,7 @@
             </div>
         </div>
 
-        <div class="kp-container" onclick="window.downloadKP()">
+        <div id="kp-download" class="kp-container" onclick="window.downloadKP()">
             <div class="total-bar">
                 <div class="total-info">
                     <span class="kp-label">Скачать коммерческое предложение</span>

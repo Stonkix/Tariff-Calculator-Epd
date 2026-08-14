@@ -11,7 +11,6 @@ const CONSTANTS = {
             "1С-ЭПД \n300 000 документов\n", "1С-ЭПД \n500 000 документов\n", "1С-ЭПД \n1 000 000 документов\n", "1С-ЭПД \n1 500 000 документов\n",
             "1С-ЭПД \n2 000 000 документов\n", "1С-ЭПД \n3 000 000 документов\n", "1С-ЭПД \n5 000 000 документов\n"
         ],
-        project: "1С-ЭПД Проектное решение",
         ukep12: "УКЭП Базис  12 месяцев", 
         ukep15: "УКЭП Базис  15 месяцев",
         kcr: "КЦР ", 
@@ -31,19 +30,12 @@ const CONSTANTS = {
             setup_mac_1: "OC MacOS nalog.ru или ЕСИА",
             setup_mac_2: "OC MacOS nalog.ru и ЕСИА",
             typical_setup: "Типовая установка",
-            project_setup: "Проектная установка",
             training: "Обучение пользователей по работе с Пр",
             goslog_win: "Регистрация на платформе «ГосЛог»\nOC Windows",
             goslog_mac: "Регистрация на платформе «ГосЛог»\nOC MacOS",
-            project_survey: "Проектное обследование",
             epd_start_tr_first: "Старт работы с ЭПД на 1-м рабочем месте (ТР)",
             epd_start_tr_next: "Старт работы с ЭПД на 2-м и последующих рабочих местах (ТР)",
-            epd_start_pr_first: "Старт работы с ЭПД на 1-м рабочем месте (ПР)",
-            epd_start_pr_next: "Старт работы с ЭПД  на 2-м и последующих рабочих местах (ПР)",
             epd_training_tr: "Обучение и консультация по запуску работы в 1С-ЭПД (ТР)",
-            epd_training_pr: "Обучение и консультация по запуску работы в 1С-ЭПД (ПР)",
-            epd_transition_survey: "Предпроектное обследование по переходу на ЭПД",
-            epd_config_update: "Доработка конфигурации 1С для работы с ЭПД",
             install_local: "Установка 1С на локальный компьютер",
             install_server: "Установка 1С на сервер",
             install_thin: "Установка 1С на тонкий клиент 1С на локальный компьютер",
@@ -75,24 +67,17 @@ const CONSTANTS = {
         {
             id: 'service', title: 'Внедрение и обучение',
             items: [
-                { id: 'install_local', label: 'Установка 1С на локальный компьютер', keyRef: 'install_local', modes: ['typical'] },
-                { id: 'install_server', label: 'Установка 1С на сервер', keyRef: 'install_server', modes: ['typical'] },
-                { id: 'install_thin', label: 'Установка 1С на тонкий клиент на локальный компьютер', keyRef: 'install_thin', modes: ['typical'] },
-                { id: 'epd_training_tr', label: 'Обучение и консультация по запуску работы в 1С-ЭПД (ТР)', keyRef: 'epd_training_tr', modes: ['typical'] },
-                { id: 'setup_project', label: 'Проектная установка', keyRef: 'project_setup', modes: ['project'] },
-                { id: 'ps1', label: 'Проектное обследование (1 час)', keyRef: 'project_survey', modes: ['project'] },
-                { id: 'epd_training_pr', label: 'Обучение и консультация по запуску работы в 1С-ЭПД (ПР)', keyRef: 'epd_training_pr', modes: ['project'] }
+                { id: 'install_local', label: 'Установка 1С на локальный компьютер', keyRef: 'install_local' },
+                { id: 'install_server', label: 'Установка 1С на сервер', keyRef: 'install_server' },
+                { id: 'install_thin', label: 'Установка 1С на тонкий клиент на локальный компьютер', keyRef: 'install_thin' },
+                { id: 'epd_training_tr', label: 'Обучение и консультация по запуску работы в 1С-ЭПД (ТР)', keyRef: 'epd_training_tr' }
             ]
         },
         {
             id: 'epd_launch', title: 'Старт и сопровождение 1С-ЭПД',
             items: [
-                { id: 'epd_start_tr_first', label: 'Старт работы с ЭПД на 1-м рабочем месте (ТР)', keyRef: 'epd_start_tr_first', modes: ['typical'] },
-                { id: 'epd_start_tr_next', label: 'Старт работы с ЭПД на 2-м и последующих рабочих местах (ТР)', keyRef: 'epd_start_tr_next', modes: ['typical'] },
-                { id: 'epd_start_pr_first', label: 'Старт работы с ЭПД на 1-м рабочем месте (ПР)', keyRef: 'epd_start_pr_first', modes: ['project'] },
-                { id: 'epd_start_pr_next', label: 'Старт работы с ЭПД на 2-м и последующих рабочих местах (ПР)', keyRef: 'epd_start_pr_next', modes: ['project'] },
-                { id: 'epd_transition_survey', label: 'Предпроектное обследование по переходу на ЭПД', keyRef: 'epd_transition_survey', modes: ['project'] },
-                { id: 'epd_config_update', label: 'Доработка конфигурации 1С для работы с ЭПД', keyRef: 'epd_config_update', modes: ['project'] }
+                { id: 'epd_start_tr_first', label: 'Старт работы с ЭПД на 1-м рабочем месте (ТР)', keyRef: 'epd_start_tr_first' },
+                { id: 'epd_start_tr_next', label: 'Старт работы с ЭПД на 2-м и последующих рабочих местах (ТР)', keyRef: 'epd_start_tr_next' }
             ]
         },
         {
@@ -113,11 +98,13 @@ const CONSTANTS = {
  */
 const State = {
     data: {
-        mainMode: 'typical',
+        mainMode: 'one-c',
         subMode: 'standard',
         docsYearly: 0,
         customDocsCount: null,
         pricing: [],
+        dokiTariffs: [],
+        dokiServices: [],
         customPrices: {},
         extraServicesEnabled: false,
         extraServices: [],
@@ -159,7 +146,11 @@ const State = {
         this.data.customPrices = {};
         this.data.extraServicesEnabled = false;
         this.data.extraServices = [this.createExtraService()];
-        
+        this.data.dokiServices.forEach(service => {
+            service.active = false;
+            service.qty = 0;
+        });
+
         this.data.ukepQty = 0;
         this.data.ukepPeriod = 12;
         this.data.sigType = null;
@@ -249,6 +240,26 @@ const State = {
     getNextPrice(key) {
         if (!this.data.pricing[3] || !key) return 0;
         return Helpers.parseNum(this.data.pricing[3][key]);
+    },
+
+    getTariffCatalog() {
+        if (this.data.mainMode === 'docs') {
+            return this.data.dokiTariffs.map(item => ({
+                key: `ЭПД в Доки ${item.docs} документов`,
+                displayName: `ЭПД в Доки ${item.docs.toLocaleString('ru-RU')} документов`,
+                docs: item.docs,
+                price: item.price,
+                unitPrice: item.unitPrice
+            }));
+        }
+
+        return CONSTANTS.KEYS.tariffs.map((key, index) => ({
+            key,
+            displayName: key.replace(/\n/g, ' ').replace(/ +/g, ' ').trim(),
+            docs: CONSTANTS.LIMITS[index],
+            price: this.getPrice(key),
+            unitPrice: this.getUnitPrice(key)
+        }));
     }
 };
 
@@ -286,13 +297,7 @@ const Calculator = {
             return { cost: 0, packages: [], totalDocs: 0, displayKey: '' };
         }
 
-        const tariffKeys = CONSTANTS.KEYS.tariffs;
-        const pkgs = tariffKeys.map((key, i) => ({
-            key: key,
-            displayName: key.replace(/\n/g, ' ').replace(/ +/g, ' ').trim(),
-            docs: CONSTANTS.LIMITS[i],
-            price: State.getPrice(key)
-        }));
+        const pkgs = State.getTariffCatalog();
 
         const MAX = Math.max(targetDocs + 100000, 200000);
         let dp = new Array(MAX + 1).fill(Infinity);
@@ -370,14 +375,10 @@ const Calculator = {
         } else if (tariffRes.line) {
             lines.push(tariffRes.line);
         }
-        
-        if (State.data.mainMode === 'project' && State.data.docsYearly > 0) {
-            const pPrice = State.data.customPrices['project'] !== undefined 
-                ? State.data.customPrices['project'] 
-                : State.getPrice(CONSTANTS.KEYS.project);
-            total += pPrice;
-            lines.push(`Проектное решение: ${Helpers.fmt(pPrice)} ₽`);
-        }
+
+        const dokiServicesRes = this.calcDokiServices();
+        total += dokiServicesRes.cost;
+        lines.push(...dokiServicesRes.lines);
 
         const sigRes = this.calcSignatures();
         total += sigRes.cost;
@@ -402,15 +403,17 @@ const Calculator = {
         if (State.data.docsYearly <= 0) return { cost: 0, line: null, lines: [], meta: null };
 
         if (State.data.subMode === 'individual') {
-            const limits = CONSTANTS.LIMITS;
-            let idx = limits.findIndex(l => l >= State.data.docsYearly);
-            const finalIdx = idx === -1 ? limits.length - 1 : idx;
+            const tariffs = State.getTariffCatalog();
+            const limits = tariffs.map(tariff => tariff.docs);
+            let idx = limits.findIndex(limit => limit >= State.data.docsYearly);
+            const finalIdx = idx === -1 ? tariffs.length - 1 : idx;
             const isAboveMaxLimit = idx === -1;
             
-            const key = CONSTANTS.KEYS.tariffs[finalIdx];
-            const limitVal = limits[finalIdx];
+            const tariff = tariffs[finalIdx];
+            const key = tariff.key;
+            const limitVal = tariff.docs;
             
-            const stdUnit = State.getUnitPrice(key);
+            const stdUnit = tariff.unitPrice;
             const customUnit = State.data.customPrices['unit'];
             const currentUnit = customUnit !== undefined ? customUnit : stdUnit;
 
@@ -419,11 +422,12 @@ const Calculator = {
             const cost = effectiveDocs * currentUnit;
 
             const displayDocs = State.data.customDocsCount !== null ? State.data.customDocsCount : defaultDocsCount;
+            const solutionName = State.data.mainMode === 'docs' ? 'ЭПД в Доки' : '1С-ЭПД';
             const displayKey = State.data.customDocsCount !== null
-                ? `1С-ЭПД ${Helpers.fmt(displayDocs)} документов`
+                ? `${solutionName} ${Helpers.fmt(displayDocs)} документов`
                 : isAboveMaxLimit
-                    ? `1С-ЭПД ${Helpers.fmt(displayDocs)} документов`
-                    : key.replace(/\n/g, ' ');
+                    ? `${solutionName} ${Helpers.fmt(displayDocs)} документов`
+                    : tariff.displayName;
 
             const line = `Тариф: ${displayKey} | ${Helpers.fmt(cost)} ₽`;
 
@@ -461,6 +465,20 @@ const Calculator = {
                 } 
             };
         }
+    },
+
+    calcDokiServices() {
+        if (State.data.mainMode !== 'docs') return { cost: 0, lines: [] };
+
+        let cost = 0;
+        const lines = [];
+        State.data.dokiServices.forEach(service => {
+            if (!service.active || service.qty <= 0) return;
+            const sum = service.price * service.qty;
+            cost += sum;
+            lines.push(`${service.name} ${Helpers.fmt(service.price)} ₽ × ${service.qty}: ${Helpers.fmt(sum)} ₽`);
+        });
+        return { cost, lines };
     },
 
     calcSignatures() {
@@ -647,9 +665,11 @@ const UI = {
 
     init() {
         this.renderAddonsHTML();
+        this.renderDokiServices();
         this.renderExtraServices();
         this.cacheElements();
         this.bindEvents();
+        this.updateSystemUI();
     },
 
     cacheElements() {
@@ -661,6 +681,45 @@ const UI = {
 
     getVisibleAddonItems(addon, currentMode = State.data.mainMode) {
         return addon.items.filter(item => !item.modes || item.modes.includes(currentMode));
+    },
+
+    updateSystemUI() {
+        const recommendation = document.getElementById('solution-recommendation');
+        const addonsContainer = document.getElementById('addons-container');
+        const solutionName = State.data.mainMode === 'docs' ? 'ЭПД в Доки' : '1С-ЭПД';
+
+        if (recommendation) {
+            recommendation.querySelector('strong').textContent = solutionName;
+        }
+        if (addonsContainer) {
+            addonsContainer.style.display = State.data.mainMode === 'docs' ? 'none' : '';
+        }
+        this.renderDokiServices();
+    },
+
+    renderDokiServices() {
+        const container = document.getElementById('doki-services-container');
+        if (!container) return;
+
+        if (State.data.mainMode !== 'docs' || !State.data.dokiServices.length) {
+            container.innerHTML = '';
+            return;
+        }
+
+        container.innerHTML = `
+            <h3 class="doki-services-title">Расширения ЭПД в Доки</h3>
+            <div class="mchd-grid doki-services-grid">
+                ${State.data.dokiServices.map(service => `
+                    <div class="mchd-card ${service.active ? 'active' : ''}" style="display:flex;flex-direction:column;">
+                        <div class="sig-header">
+                            <strong>${Helpers.escapeHtml(service.name)}</strong>
+                            <label class="custom-switch">
+                                <input type="checkbox" data-action="toggle-doki-service" data-id="${service.id}" ${service.active ? 'checked' : ''}>
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                    </div>`).join('')}
+            </div>`;
     },
 
     renderAddonsHTML() {
@@ -821,8 +880,6 @@ const UI = {
         }
 
         const isInd = State.data.subMode === 'individual';
-        const isProject = State.data.mainMode === 'project';
-
         let tariffHTML = '';
 
         if (isInd) {
@@ -873,22 +930,6 @@ const UI = {
                 ${pricePerDocRow}`;
         }
 
-        let projectHtml = '';
-        if (isProject) {
-            const pPrice = State.data.customPrices['project'] !== undefined 
-                ? State.data.customPrices['project'] 
-                : State.getPrice(CONSTANTS.KEYS.project);
-            const pInput = isInd
-                ? `<input type="text" class="tariff-field-input" value="${pPrice.toString().replace('.', ',')}" data-action="custom-price" data-type="project">`
-                : `<strong>${Helpers.fmt(pPrice)}</strong>`;
-
-            projectHtml = `
-                <div class="detail-row project-row">
-                    <span>Проектное решение</span>
-                    <div class="price-edit-block">${pInput}<span class="unit-text">₽</span></div>
-                </div>`;
-        }
-
         const labelText = isInd 
             ? 'Индивидуальные условия' 
             : (meta.packages.length > 1 || (meta.packages.length === 1 && meta.packages[0].qty > 1) 
@@ -903,7 +944,6 @@ const UI = {
                 </div>
                 <div class="detailing-section">
                     ${tariffHTML}
-                    ${projectHtml}
                 </div>
             </div>`;
     },
@@ -1128,6 +1168,12 @@ const UI = {
             State.data.addons[addon].values[item] = Math.max(0, parseInt(val)||0);
             this.update();
         }
+        else if (act === 'doki-service-qty') {
+            const service = State.data.dokiServices.find(item => item.id === t.dataset.id);
+            if (!service) return;
+            service.qty = Math.max(0, parseInt(val) || 0);
+            this.update();
+        }
         else if (act === 'extra-service-name') {
             const row = State.data.extraServices.find(item => item.id === t.dataset.id);
             if (!row) return;
@@ -1206,6 +1252,15 @@ const UI = {
             document.getElementById(`addon-card-${id}`).classList.toggle('active', t.checked);
             this.update();
         }
+        else if (act === 'toggle-doki-service') {
+            const service = State.data.dokiServices.find(item => item.id === t.dataset.id);
+            if (!service) return;
+            service.active = t.checked;
+            if (service.active && !service.qty) service.qty = 1;
+            if (!service.active) service.qty = 0;
+            this.renderDokiServices();
+            this.update();
+        }
         else if (act === 'toggle-extra-services') {
             State.data.extraServicesEnabled = t.checked;
             this.renderExtraServices();
@@ -1225,10 +1280,10 @@ const UI = {
             t.classList.add('selected');
             
             State.data.mainMode = t.dataset.val;
-            
+            this.updateSystemUI();
             State.resetCalculation();
-            
             this.renderAddonsHTML();
+            this.renderDokiServices();
             this.renderExtraServices();
             this.update();
         }
@@ -1397,14 +1452,41 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.updateValidityDisplay();
 
     try {
-        const res = await fetch('epd-tariffs.json');
-        const text = await res.text();
-        try {
-            State.data.pricing = JSON.parse(text);
-        } catch(e) {
-            State.data.pricing = JSON.parse("[" + text.replace(/}\s*{/g, "},{") + "]");
+        const [epdResponse, dokiResponse] = await Promise.all([
+            fetch('epd-tariffs.json'),
+            fetch('Цены ЭПД в Доки.json')
+        ]);
+        const [epdText, dokiText] = await Promise.all([epdResponse.text(), dokiResponse.text()]);
+        const parseJsonObjects = text => {
+            try {
+                return JSON.parse(text);
+            } catch (e) {
+                return JSON.parse("[" + text.replace(/}\s*{/g, "},{") + "]");
+            }
+        };
+
+        State.data.pricing = parseJsonObjects(epdText);
+        State.data.dokiTariffs = parseJsonObjects(dokiText).map(item => ({
+            docs: Helpers.parseNum(item['Кол-во документов ЭДО и титулов ЭПД на год']),
+            price: Helpers.parseNum(item['Стоимость тарифа, руб. / год']),
+            unitPrice: Helpers.parseNum(item['Стоимость 1 док-та / титула, руб. (справочно)'])
+        })).filter(item => item.docs > 0 && item.price > 0);
+        State.data.dokiServices = parseJsonObjects(dokiText)
+            .filter(item => item['Доп услуги'] && item['Стоимость услуги, руб. / год'])
+            .map((item, index) => ({
+                id: `doki-service-${index}`,
+                name: item['Доп услуги'],
+                price: Helpers.parseNum(item['Стоимость услуги, руб. / год']),
+                active: false,
+                qty: 0
+            })).filter(item => item.price > 0);
+
+        if (!State.data.dokiTariffs.length) {
+            throw new Error('Не удалось загрузить тарифы ЭПД в Доки');
         }
+
         UI.renderAddonsHTML();
+        UI.renderDokiServices();
         UI.update(); 
     } catch (e) { 
         console.error("Ошибка загрузки цен", e); 
@@ -1423,8 +1505,7 @@ window.downloadKP = async () => {
     const partnerPhone = document.getElementById('partner-phone')?.value.trim() || '';
     const partnerEmail = document.getElementById('partner-email')?.value.trim() || '';
 
-    const isTypical = State.data.mainMode === 'typical';
-    const prefix    = isTypical ? 'epd-pdf-base' : 'epd-pdf-project';
+    const prefix = 'epd-pdf-base';
 
     async function toBase64(url) {
         try {
@@ -1588,26 +1669,6 @@ window.downloadKP = async () => {
             ${contactBlock}
         </div>`;
 
-    const projectContactBlock = `
-        <div style="padding:24px 44px 30px;">
-            <div style="font-size:16pt;font-weight:800;color:#7c3aed;margin-bottom:12px;">С нами работают:</div>
-            <ul style="margin:0 0 20px 18px;padding:0;list-style:disc;font-size:18pt;line-height:1.45;">
-                ${clientsData.slice(0, -1).map(c => `
-                    <li style="margin-bottom:0;">
-                        <span style="font-size:12pt;vertical-align:middle;">
-                            <a href="${c.url}" style="color:#7c3aed;text-decoration:underline;">${c.text}</a>
-                        </span>
-                    </li>`).join('')}
-                <li style="margin-bottom:0;">
-                    <span style="font-size:12pt;vertical-align:middle;">
-                        <a href="${clientsData[clientsData.length-1].url}" style="color:#7c3aed;text-decoration:underline;">${clientsData[clientsData.length-1].text}</a>
-                        <span style="color:#1a1a2e;"> и другие.</span>
-                    </span>
-                </li>
-            </ul>
-            ${contactBlock}
-        </div>`;
-
     const summaryContactHTML = `
         <div style="padding:0 44px 30px;">
             ${summaryBlock}
@@ -1731,7 +1792,7 @@ window.downloadKP = async () => {
         <div style="width:794px;background:#fff;box-sizing:border-box;">
             ${page2Top}
             ${b64Middle ? `<img src="${b64Middle}" style="width:794px;display:block;">` : ''}
-            ${isTypical ? clientsBlockContent : projectContactBlock}
+            ${clientsBlockContent}
         </div>`;
 
     const page3HTML = `
@@ -1863,4 +1924,3 @@ window.updateCustomPrice = (key, value) => {
     document.getElementById('total-price').textContent = Helpers.fmt(result.total) + ' ₽';
     document.getElementById('details-content').innerHTML = result.lines.map(line => Helpers.escapeHtml(line)).join('<br>');
 };
-

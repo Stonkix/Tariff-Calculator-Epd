@@ -121,6 +121,23 @@ body {
     margin: 5px 0;
 }
 
+#doki-services-container {
+    margin-top: 25px;
+}
+
+.doki-services-title {
+    color: #7C39BF;
+    margin: 0 0 15px;
+}
+
+.doki-services-grid {
+    margin-top: 0;
+}
+
+.doki-services-grid .mchd-card {
+    min-height: 88px;
+}
+
 .mchd-input {
     margin-top: 10px;
 }
@@ -224,6 +241,19 @@ input:disabled + .slider {
 
 .toggle-btn:hover:not(.selected) {
     background: rgba(124, 57, 191, 0.1);
+}
+
+.solution-badge {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px 18px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, var(--primary), #9B51E0);
+    color: #fff;
+    text-align: center;
+    font-size: 16px;
+    letter-spacing: 0.2px;
+    box-shadow: 0 6px 16px rgba(124, 57, 191, 0.22);
 }
 
 .qty-input, .price-input {
