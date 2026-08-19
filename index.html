@@ -262,6 +262,19 @@
                                onchange="window.handleCustomDatePick(this.value)">
                     </div>
                 </div>
+                <div>
+                    <label for="kp-type" style="display: block; margin-bottom: 6px; font-size: 13px; font-weight: 600; color: var(--text);">Тип КП</label>
+                    <select id="kp-type" onchange="window.handleKpTypeChange(this.value)"
+                            style="width: 100%; padding: 12px; border: 2px solid #eee; border-radius: 10px; font-family: inherit; font-size: 14px; background: #fff; color: var(--text); cursor: pointer;">
+                        <option value="general" selected>Общее (обычное КП)</option>
+                        <option value="food">Отраслевое КП — Пищевые производства</option>
+                        <option value="alcohol">Отраслевое КП — Алкоголь</option>
+                        <option value="agriculture">Отраслевое КП — Сельхоз</option>
+                        <option value="forwarders">Отраслевое КП — Экспедиторы</option>
+                        <option value="manufacturing">Отраслевое КП — Промышленное производство</option>
+                        <option value="small-carrier">Отраслевое КП — Малый перевозчик</option>
+                    </select>
+                </div>
             
             </div>
         </div>

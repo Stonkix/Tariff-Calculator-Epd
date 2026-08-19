@@ -1414,6 +1414,10 @@ window.updateValidityDisplay = () => {
 // Алиас для совместимости с downloadKP
 window.updateValidityDate = window.updateValidityDisplay;
 
+window.handleKpTypeChange = (value) => {
+    localStorage.setItem('epd-kp-type', value);
+};
+
 // Закрывать дропдаун при клике вне
 document.addEventListener('click', (e) => {
     const display = document.getElementById('kp-validity-display');
@@ -1450,6 +1454,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     localStorage.removeItem('epd-kp-custom-date'); 
 
     window.updateValidityDisplay();
+
+    const kpType = document.getElementById('kp-type');
+    localStorage.removeItem('epd-kp-type');
+    if (kpType) kpType.value = 'general';
 
     try {
         const [epdResponse, dokiResponse] = await Promise.all([
@@ -1643,6 +1651,130 @@ window.downloadKP = async () => {
                 ${partnerEmail ? `<div>${partnerEmail}</div>` : ''}
             </div>
         </div>`;
+
+    const kpType = document.getElementById('kp-type')?.value || 'general';
+    if (kpType === 'food' || kpType === 'alcohol' || kpType === 'agriculture' || kpType === 'forwarders' || kpType === 'manufacturing' || kpType === 'small-carrier') {
+        const isAlcohol = kpType === 'alcohol';
+        const isManufacturing = kpType === 'manufacturing';
+        const hasSixImages = isAlcohol || kpType === 'agriculture' || kpType === 'manufacturing' || kpType === 'small-carrier';
+        const industryPrefix = isAlcohol ? 'epd-pdf-alko' : kpType === 'agriculture' ? 'epd-pdf-selhoz' : kpType === 'forwarders' ? 'epd-pdf-ekspeditori' : kpType === 'manufacturing' ? 'epd-pdf-proizvodstvo' : kpType === 'small-carrier' ? 'epd-pdf-maliyperevozhik' : 'epd-pdf-eda';
+        const industryImageCount = hasSixImages ? 6 : 5;
+        const foodImages = await Promise.all(
+            Array.from({ length: industryImageCount }, (_, index) => toBase64(`${industryPrefix}-${index + 1}.jpg`))
+        );
+        if (foodImages.some(image => !image)) {
+            alert('Не удалось загрузить изображения отраслевого КП. Проверьте файлы шаблона.');
+            return;
+        }
+
+        const foodRows = buildRows(lines)
+            .replaceAll('#7c3aed', '#c15add')
+            .replaceAll('#ede8ff', '#eee1ff');
+        const foodTable = `<div style="padding:12px 44px 0;"><div style="font-size:12pt;font-weight:800;color:#c15add;margin-bottom:8px;">Стоимость подключения:</div><table style="width:100%;border-collapse:collapse;table-layout:fixed;"><colgroup><col style="width:70%"><col style="width:30%"></colgroup><tbody>${foodRows}</tbody></table></div>`;
+        const foodSummaryBlock = summaryBlock
+            .replaceAll('#f3f0ff', '#eee1ff')
+            .replaceAll('#6d28d9', '#c15add')
+            .replaceAll('#7c3aed', '#c15add');
+        const foodContactBlock = contactBlock
+            .replace('border:1px solid #ede8ff', 'border:1px solid #eee1ff;background:#eee1ff')
+            .replaceAll('#7c3aed', '#c15add');
+        const foodSummary = `<div style="padding:0 44px;">${foodSummaryBlock}</div>`;
+        const foodContacts = `<div style="padding:0 44px 16px;">${foodContactBlock}</div>`;
+        const page2LastImage = hasSixImages && !isManufacturing ? `<img src="${foodImages[3]}" style="display:block;width:784px;height:auto;">` : '';
+        const page2Images = `<img src="${foodImages[1]}" style="display:block;width:784px;height:auto;"><img src="${foodImages[2]}" style="display:block;width:784px;height:auto;">${page2LastImage}`;
+        const page3Image = foodImages[hasSixImages ? 4 : 3];
+        const page3Images = isManufacturing
+            ? `<img src="${foodImages[3]}" style="display:block;width:794px;height:auto;"><img src="${foodImages[4]}" style="display:block;width:794px;height:auto;">`
+            : `<img src="${page3Image}" style="display:block;width:794px;height:auto;">`;
+        const page4Image = foodImages[hasSixImages ? 5 : 4];
+        let pages = [
+            `<div style="width:794px;background:#fff;box-sizing:border-box;"><img src="${foodImages[0]}" style="display:block;width:794px;height:auto;margin:0 auto;">${foodTable}${foodSummary}${foodContacts}</div>`,
+            `<div style="width:794px;background:#fff;box-sizing:border-box;padding:0 5px;">${page2Images}</div>`,
+            `<div style="width:794px;background:#fff;box-sizing:border-box;">${page3Images}${foodContacts}</div>`,
+            `<div style="width:794px;background:#fff;box-sizing:border-box;"><img src="${page4Image}" style="display:block;width:794px;height:auto;"></div>`
+        ];
+
+        const firstPageMeasure = document.createElement('div');
+        firstPageMeasure.style.cssText = 'position:absolute;top:0;left:-9999px;width:794px;background:#fff;visibility:hidden;';
+        firstPageMeasure.innerHTML = pages[0];
+        document.body.appendChild(firstPageMeasure);
+        await Promise.all([...firstPageMeasure.querySelectorAll('img')].map(image => image.decode?.().catch(() => {})));
+        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        const moveContactsToPage2 = firstPageMeasure.scrollHeight > 1122;
+        document.body.removeChild(firstPageMeasure);
+
+        if (moveContactsToPage2) {
+            let page2ImageIndexes = isManufacturing ? [1, 2] : hasSixImages ? [1, 2, 3] : [1, 2];
+            const movedToPage3 = [];
+
+            while (page2ImageIndexes.length) {
+                const page2Photos = page2ImageIndexes.map(index =>
+                    `<img src="${foodImages[index]}" style="display:block;width:784px;height:auto;">`
+                ).join('');
+                const page2Measure = document.createElement('div');
+                page2Measure.style.cssText = 'position:absolute;top:0;left:-9999px;width:794px;background:#fff;visibility:hidden;';
+                page2Measure.innerHTML = `<div style="width:794px;box-sizing:border-box;padding:0 5px;">${foodContacts}${page2Photos}</div>`;
+                document.body.appendChild(page2Measure);
+                await Promise.all([...page2Measure.querySelectorAll('img')].map(image => image.decode?.().catch(() => {})));
+                await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+                const page2Fits = page2Measure.scrollHeight <= 1122;
+                document.body.removeChild(page2Measure);
+                if (page2Fits) break;
+                movedToPage3.unshift(page2ImageIndexes.pop());
+            }
+
+            const page2Photos = page2ImageIndexes.map(index =>
+                `<img src="${foodImages[index]}" style="display:block;width:784px;height:auto;">`
+            ).join('');
+            const page3MovedPhotos = movedToPage3.map(index =>
+                `<img src="${foodImages[index]}" style="display:block;width:794px;height:auto;">`
+            ).join('');
+            pages = [
+                `<div style="width:794px;background:#fff;box-sizing:border-box;"><img src="${foodImages[0]}" style="display:block;width:794px;height:auto;margin:0 auto;">${foodTable}${foodSummary}</div>`,
+                `<div style="width:794px;background:#fff;box-sizing:border-box;padding:0 5px;">${foodContacts}${page2Photos}</div>`,
+                `<div style="width:794px;background:#fff;box-sizing:border-box;">${page3MovedPhotos}${page3Images}${foodContacts}</div>`,
+                pages[3]
+            ];
+        }
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(30,0,60,0.5);z-index:99998;display:flex;align-items:center;justify-content:center;';
+        overlay.innerHTML = '<div style="background:#fff;padding:28px 40px;border-radius:14px;text-align:center;font-family:Arial,sans-serif;"><div style="font-size:26px;margin-bottom:10px;">📄</div><div style="font-size:14px;font-weight:600;color:#6d28d9;">Создаём PDF...</div></div>';
+        document.body.appendChild(overlay);
+
+        try {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'portrait' });
+            const PDF_W = 595.28;
+            const PDF_H = 841.89;
+            for (const [index, html] of pages.entries()) {
+                const div = document.createElement('div');
+                div.style.cssText = 'position:absolute;top:0;left:0;width:794px;background:#fff;z-index:99999;';
+                div.innerHTML = html;
+                document.body.appendChild(div);
+                await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+                const scale = PDF_W / 794;
+                const divRect = div.getBoundingClientRect();
+                const links = [...div.querySelectorAll('a[href]')].map(link => {
+                    const rect = link.getBoundingClientRect();
+                    return { x: (rect.left - divRect.left) * scale - 4, y: (rect.top - divRect.top) * scale - 4, width: rect.width * scale + 8, height: rect.height * scale + 8, url: link.href };
+                });
+                const canvas = await html2canvas(div, { scale: 3, useCORS: true, allowTaint: false, backgroundColor: '#ffffff', width: 794, height: div.scrollHeight, windowWidth: 794 });
+                document.body.removeChild(div);
+                const imgHeight = (canvas.height / canvas.width) * PDF_W;
+                if (imgHeight > PDF_H + 0.1) throw new Error(`Содержимое страницы ${index + 1} не помещается на лист A4`);
+                if (index > 0) doc.addPage();
+                doc.addImage(canvas.toDataURL('image/jpeg', 1.0), 'JPEG', 0, 0, PDF_W, imgHeight);
+                links.forEach(link => doc.link(link.x, link.y, link.width, link.height, { url: link.url }));
+            }
+            doc.save(`КП Астрал.ЭПД для ${clientName}.pdf`);
+        } catch (err) {
+            console.error('Ошибка PDF:', err);
+            alert(`Ошибка создания PDF: ${err.message}`);
+        } finally {
+            document.body.removeChild(overlay);
+        }
+        return;
+    }
 
     const contactUrl  = 'https://astral.ru/contacts/';
     const clientsData = [
